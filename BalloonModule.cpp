@@ -1,7 +1,10 @@
 /*
  * BalloonModule.cpp
- * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached to 
- * green -> SDA, blue -> SCL, white -> 3.3v, black -> GND
+ * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached
+ * green -> SDA
+ * blue -> SCL
+ * white -> 3.3v
+ * black -> GND
  */
 
 #include <BalloonModule.h>
@@ -12,7 +15,7 @@ BalloonModule::BalloonModule()
     // do nothing
 }
 
-// Initialize pressure sensor (start readings). This should be the first line of setup.
+// Initialize pressure sensor (start readings). This should be the first line of setup. YOU CANNOT TAKE READINGS IF YOU DON'T INITIALIZE
 void BalloonModule::initialize()
 {
     Serial.begin(9600);
@@ -180,7 +183,7 @@ double BalloonModule::getRelativeAltitude()
     return pressureSensor.altitude(getPressure(), baselinePressure);
 }
 
-// Prints time in [HH:MM:SS]
+// Prints time in [HH:MM:SS]. Use this at the beginning of output lines to make it more readable
 void BalloonModule::printTime()
 {
     MET = (double) millis() / 1000.0;    // convert from milliseconds to seconds

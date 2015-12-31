@@ -1,7 +1,10 @@
 /*
  * BalloonModule.h
- * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached to 
- * green -> SDA, blue -> SCL, white -> 3.3v, black -> GND
+ * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached
+ * green -> SDA
+ * blue -> SCL
+ * white -> 3.3v
+ * black -> GND
  */
 
 #include <SFE_BMP180.h>
@@ -20,18 +23,25 @@ class BalloonModule
     public:
         // base library type
         BalloonModule();
-        // Initialize pressure sensor (start readings). This should be the first line of setup.
+
+        // Initialize pressure sensor (start readings). This should be the first line of setup. YOU CANNOT TAKE READINGS IF YOU DON'T INITIALIZE
         void initialize();
+
         // Main looping code to detect and print altitude. Starts once launch is detected
         void printStatusAfterLaunch();
+
         // Returns current pressure reading using temperature
         double getPressure();
+
         // Returns current altitude difference from baseline reading using current pressure
         double getRelativeAltitude();
-        // Prints time in [HH:MM:SS]
+
+        // Prints time in [HH:MM:SS]. Use this at the beginning of output lines to make it more readable
         void printTime();
+
         // Prints meters and feet equivalent to the console; for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
         void printMetersAndFeet(double value);
+
         // prints current altitude
         void printAltitude();
 };
