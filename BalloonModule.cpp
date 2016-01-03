@@ -63,11 +63,20 @@ void BalloonModule::initialize()
     delay(3000);
 }
 
-// Main looping code to detect and print altitude. Starts once launch is detected
+// Measures and prints altitude
+void BalloonModule::printStatus()
+{
+    altitude = getAltitude();
+    printTime();
+    printAltitude();
+    Serial.println();
+}
+
+// Same as printStatus, but only starts once launch is detected
 void BalloonModule::printStatusAfterLaunch()
 {
     // Get the relative altitude difference between the new reading and the baseline reading
-    altitude = module.getRelativeAltitude();
+    altitude = getAltitude();
     
     // Check if current altitude is high enough to resume output (launch detected)
     if (altitude > 20.0)
@@ -87,9 +96,7 @@ void BalloonModule::printStatusAfterLaunch()
     
     if (isLaunched)
     {
-        printTime();
-        module.printAltitude();
-        Serial.println();
+        printStatus();
     }
     
     delay (delayMilliseconds);
@@ -178,7 +185,7 @@ double BalloonModule::getPressure()
 }
 
 // Returns current altitude difference from baseline reading using current pressure
-double BalloonModule::getRelativeAltitude()
+double BalloonModule::getAltitude()
 {
     return pressureSensor.altitude(getPressure(), baselinePressure);
 }
