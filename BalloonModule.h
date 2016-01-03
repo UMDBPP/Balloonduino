@@ -27,14 +27,17 @@ class BalloonModule
         // Initialize pressure sensor (start readings). This should be the first line of setup. YOU CANNOT TAKE READINGS IF YOU DON'T INITIALIZE
         void initialize();
 
-        // Main looping code to detect and print altitude. Starts once launch is detected
-        void printStatusAfterLaunch();
+        // Measures and prints altitude, returns altitude
+        double printStatus();
+
+        // Same as printStatus, but only starts once launch is detected. Returns altitude.
+        double printStatusAfterLaunch();
 
         // Returns current pressure reading using temperature
         double getPressure();
 
         // Returns current altitude difference from baseline reading using current pressure
-        double getRelativeAltitude();
+        double getAltitude();
 
         // Prints time in [HH:MM:SS]. Use this at the beginning of output lines to make it more readable
         void printTime();

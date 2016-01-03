@@ -63,36 +63,46 @@ void BalloonModule::initialize()
     delay(3000);
 }
 
-// Main looping code to detect and print altitude. Starts once launch is detected
-void BalloonModule::printStatusAfterLaunch()
+// Measures and prints altitude, returns altitude
+double BalloonModule::printStatus()
 {
-    // Get the relative altitude difference between the new reading and the baseline reading
-    altitude = module.getRelativeAltitude();
-    
-    // Check if current altitude is high enough to resume output (launch detected)
-    if (altitude > 20.0)
+    altitude = getAltitude();
+    printTime();
+    printAltitude();
+    Serial.println();
+    return altitude;
+}
+
+// Same as printStatus, but only starts once launch is detected. Returns altitude.
+double BalloonModule::printStatusAfterLaunch()
+{
+    if (isLaunched)
     {
-        launchTolerance++;
+        altitude = printStatus();
     }
     else
     {
-        launchTolerance = 0;
+        // Get the relative altitude difference between the new reading and the baseline reading
+        altitude = getAltitude();
+        
+        // Check if current altitude is high enough to resume output (launch detected)
+        if (altitude > 20.0)
+        {
+            launchTolerance++;
+        }
+        else
+        {
+            launchTolerance = 0;
+        }
+        if (launchTolerance > 5)
+        {
+            isLaunched = true;
+            printTime();
+            Serial.println("Launch detected. Resuming output.");
+        }
     }
-    if (launchTolerance > 5)
-    {
-        isLaunched = true;
-        printTime();
-        Serial.println("Launch detected. Resuming output.");
-    }
-    
-    if (isLaunched)
-    {
-        printTime();
-        module.printAltitude();
-        Serial.println();
-    }
-    
     delay (delayMilliseconds);
+    return altitude;
 }
 
 // Returns current pressure reading using temperature
@@ -178,7 +188,7 @@ double BalloonModule::getPressure()
 }
 
 // Returns current altitude difference from baseline reading using current pressure
-double BalloonModule::getRelativeAltitude()
+double BalloonModule::getAltitude()
 {
     return pressureSensor.altitude(getPressure(), baselinePressure);
 }
