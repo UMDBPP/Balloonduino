@@ -63,43 +63,46 @@ void BalloonModule::initialize()
     delay(3000);
 }
 
-// Measures and prints altitude
-void BalloonModule::printStatus()
+// Measures and prints altitude, returns altitude
+double BalloonModule::printStatus()
 {
     altitude = getAltitude();
     printTime();
     printAltitude();
     Serial.println();
+    return altitude;
 }
 
-// Same as printStatus, but only starts once launch is detected
-void BalloonModule::printStatusAfterLaunch()
+// Same as printStatus, but only starts once launch is detected. Returns altitude.
+double BalloonModule::printStatusAfterLaunch()
 {
-    // Get the relative altitude difference between the new reading and the baseline reading
-    altitude = getAltitude();
-    
-    // Check if current altitude is high enough to resume output (launch detected)
-    if (altitude > 20.0)
+    if (isLaunched)
     {
-        launchTolerance++;
+        altitude = printStatus();
     }
     else
     {
-        launchTolerance = 0;
+        // Get the relative altitude difference between the new reading and the baseline reading
+        altitude = getAltitude();
+        
+        // Check if current altitude is high enough to resume output (launch detected)
+        if (altitude > 20.0)
+        {
+            launchTolerance++;
+        }
+        else
+        {
+            launchTolerance = 0;
+        }
+        if (launchTolerance > 5)
+        {
+            isLaunched = true;
+            printTime();
+            Serial.println("Launch detected. Resuming output.");
+        }
     }
-    if (launchTolerance > 5)
-    {
-        isLaunched = true;
-        printTime();
-        Serial.println("Launch detected. Resuming output.");
-    }
-    
-    if (isLaunched)
-    {
-        printStatus();
-    }
-    
     delay (delayMilliseconds);
+    return altitude;
 }
 
 // Returns current pressure reading using temperature
