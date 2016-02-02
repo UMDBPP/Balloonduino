@@ -1,4 +1,7 @@
 # BalloonModule
-Arduino library for basic functions of balloon payload module (Arduino Uno with BMP180 pressure sensor)
+Arduino library for basic functions of a balloon payload module (Arduino Uno connected to BMP180 pressure sensor)
 
-Requires SFE_BMP180 pressure sensor library (https://github.com/LowPowerLab/SFE_BMP180.git)
+##Includes
+- SFE_BMP180 pressure sensor library (https://github.com/LowPowerLab/SFE_BMP180.git)
+
+Arduino IDE: https://www.arduino.cc/en/Main/Software
