@@ -209,8 +209,7 @@ void BalloonModule::initialize()
         }
         else
         {
-            Serial.println(
-                    "Pressure sensor initialization failed (is it disconnected?)");
+            Serial.println("Pressure sensor failed (is it disconnected?)");
             printTime();
             Serial.println("System going to sleep.");
             while (1)
@@ -232,8 +231,7 @@ void BalloonModule::initialize()
         Serial.println();
         
         printTime();
-        Serial.println(
-                "System is ready for launch. Output will resume when launch is detected.");
+        Serial.println("System ready. Output will resume at launch.");
     }
     delay(3000);
 }
