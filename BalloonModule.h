@@ -22,23 +22,14 @@ class BalloonModule
 {
     public:
         BalloonModule();
-
-        void initialize();
-
         double printStatus();
-
         double printStatusAfterLaunch();
-
         double getPressure();
-
         double getAltitude();
-
         void printTime();
-
         void printMetersAndFeet(double value);
-
         void printAltitude();
-        
+
     private:
         void initialize();
 };
