@@ -21,30 +21,24 @@ SFE_BMP180 pressureSensor;
 class BalloonModule
 {
     public:
-        // base library type
         BalloonModule();
 
-        // Initialize pressure sensor (start readings). This should be the first line of setup. YOU CANNOT TAKE READINGS IF YOU DON'T INITIALIZE
         void initialize();
 
-        // Measures and prints altitude, returns altitude
         double printStatus();
 
-        // Same as printStatus, but only starts once launch is detected. Returns altitude.
         double printStatusAfterLaunch();
 
-        // Returns current pressure reading using temperature
         double getPressure();
 
-        // Returns current altitude difference from baseline reading using current pressure
         double getAltitude();
 
-        // Prints time in [HH:MM:SS]. Use this at the beginning of output lines to make it more readable
         void printTime();
 
-        // Prints meters and feet equivalent to the console; for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
         void printMetersAndFeet(double value);
 
-        // prints current altitude
         void printAltitude();
+        
+    private:
+        void initialize();
 };

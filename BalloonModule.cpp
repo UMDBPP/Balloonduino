@@ -9,60 +9,6 @@
 
 #include <BalloonModule.h>
 
-// Base library type
-BalloonModule::BalloonModule()
-{
-    // do nothing
-}
-
-// Initialize pressure sensor (start readings). This should be the first line of setup. YOU CANNOT TAKE READINGS IF YOU DON'T INITIALIZE
-void BalloonModule::initialize()
-{
-    Serial.begin(9600);
-    
-    printTime();
-    Serial.println("Initializing...");
-    
-    if (pressureSensor.begin())
-    {
-        printTime();
-        if (pressureSensor.begin())
-        {
-            Serial.println("Pressure sensor successfully initialized.");
-            printTime();
-            Serial.println("Now attempting baseline pressure reading...");
-        }
-        else
-        {
-            Serial.println(
-                    "Pressure sensor initialization failed (is it disconnected?)");
-            printTime();
-            Serial.println("System going to sleep.");
-            while (1)
-            {
-                // infinite loop to pause forever
-            }
-        }
-        
-        delay(1000);
-        
-        // Get baseline pressure
-        baselinePressure = getPressure();
-        
-        // Print baseline pressure
-        printTime();
-        Serial.print("Baseline pressure is ");
-        Serial.print(baselinePressure);
-        Serial.print(" mb.");
-        Serial.println();
-        
-        printTime();
-        Serial.println(
-                "System is ready for launch. Output will resume when launch is detected.");
-    }
-    delay(3000);
-}
-
 // Measures and prints altitude, returns altitude
 double BalloonModule::printStatus()
 {
@@ -236,4 +182,58 @@ void BalloonModule::printAltitude()
     Serial.print("Altitude is ");
     printMetersAndFeet (altitude);
     Serial.print(" above launch site. ");
+}
+
+// Base library type
+BalloonModule::BalloonModule()
+{
+    initialize();
+}
+
+// Initialize pressure sensor (start readings).
+void BalloonModule::initialize()
+{
+    Serial.begin(9600);
+    
+    printTime();
+    Serial.println("Initializing...");
+    
+    if (pressureSensor.begin())
+    {
+        printTime();
+        if (pressureSensor.begin())
+        {
+            Serial.println("Pressure sensor successfully initialized.");
+            printTime();
+            Serial.println("Now attempting baseline pressure reading...");
+        }
+        else
+        {
+            Serial.println(
+                    "Pressure sensor initialization failed (is it disconnected?)");
+            printTime();
+            Serial.println("System going to sleep.");
+            while (1)
+            {
+                // infinite loop to pause forever
+            }
+        }
+        
+        delay(1000);
+        
+        // Get baseline pressure
+        baselinePressure = getPressure();
+        
+        // Print baseline pressure
+        printTime();
+        Serial.print("Baseline pressure is ");
+        Serial.print(baselinePressure);
+        Serial.print(" mb.");
+        Serial.println();
+        
+        printTime();
+        Serial.println(
+                "System is ready for launch. Output will resume when launch is detected.");
+    }
+    delay(3000);
 }
