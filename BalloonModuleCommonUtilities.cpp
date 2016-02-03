@@ -1,9 +1,9 @@
 /*
- * BalloonModule.cpp
+ * BalloonModuleCommonUtilities.cpp
  * balloonduino: modified Arduino Mega
  */
 
-#include <BalloonModule.h>
+#include <BalloonModuleCommonUtilities.h>
 
 // Base library type
 BalloonModuleCommonUtilities::BalloonModuleCommonUtilities()
@@ -14,16 +14,19 @@ BalloonModuleCommonUtilities::BalloonModuleCommonUtilities()
 double BalloonModuleCommonUtilities::getAltitude()
 {
     // TODO altitude function for Balloonduino
+    return altitude;
 }
 
 double BalloonModuleCommonUtilities::getTemperature()
 {
     // TODO temperature function for Balloonduino
+    return temperature;
 }
 
 double BalloonModuleCommonUtilities::getPressure()
 {
     // TODO pressure function for Balloonduino
+    return pressure;
 }
 
 // TODO other Balloonduino sensors

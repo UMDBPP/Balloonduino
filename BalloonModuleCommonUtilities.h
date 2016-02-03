@@ -1,10 +1,6 @@
 /*
- * BalloonModule.h
- * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached
- * green -> SDA
- * blue -> SCL
- * white -> 3.3v
- * black -> GND
+ * BalloonModuleCommonUtilities.h
+ * balloonduino: modified Arduino Mega
  */
 
 #include <SFE_BMP180.h>
@@ -27,7 +23,7 @@ class BalloonModuleCommonUtilities
         void printStatusNow();
         void printStatusDuringFlight();
     private:
-        unsigned long milliseconds, delayMilliseconds = 1000;
+        unsigned long milliseconds = 0, delayMilliseconds = 1000;
         byte hours = 0, minutes = 0, seconds = 0, launchTolerance = 0;
-        double altitude, temperature;
+        double altitude = 0, temperature = 0, pressure = 0;
 };
