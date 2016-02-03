@@ -43,7 +43,7 @@ void BalloonModuleCommonUtilities::printMetersAndFeet(double meters)
 
 // Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
 // for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
-void printCelsiusAndFahrenheit(double celsius)
+void BalloonModuleCommonUtilities::printCelsiusAndFahrenheit(double celsius)
 {
     Serial.print(celsius);
     Serial.print(" Celsius (");
@@ -53,7 +53,7 @@ void printCelsiusAndFahrenheit(double celsius)
 
 // Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
 // for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
-void printPascalsAndAtmospheres(double pascals)
+void BalloonModuleCommonUtilities::printPascalsAndAtmospheres(double pascals)
 {
     Serial.print(pascals);
     Serial.print(" Pascals (");
@@ -143,7 +143,7 @@ void BalloonModuleCommonUtilities::printStatusDuringFlight()
         }
         else
         {
-            launchTolerance = 0;
+            launchTolerance--;
         }
         if (launchTolerance > 5)
         {

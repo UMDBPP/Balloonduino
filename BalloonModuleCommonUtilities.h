@@ -3,10 +3,6 @@
  * balloonduino: modified Arduino Mega
  */
 
-#include <SFE_BMP180.h>
-
-SFE_BMP180 pressureSensor;
-
 class BalloonModuleCommonUtilities
 {
     public:
@@ -16,6 +12,7 @@ class BalloonModuleCommonUtilities
         double getPressure();
         void printMetersAndFeet(double meters);
         void printCelsiusAndFahrenheit(double celsius);
+        void printPascalsAndAtmospheres(double pascals);
         void printAltitude();
         void printTemperature();
         void printPressure();
