@@ -11,10 +11,10 @@
 
 SFE_BMP180 pressureSensor;
 
-class BalloonModule
+class BalloonModuleCommonUtilities
 {
     public:
-        BalloonModule();
+        BalloonModuleCommonUtilities();
         double getAltitude();
         double getTemperature();
         double getPressure();

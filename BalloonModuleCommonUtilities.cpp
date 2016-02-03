@@ -6,22 +6,22 @@
 #include <BalloonModule.h>
 
 // Base library type
-BalloonModule::BalloonModule()
+BalloonModuleCommonUtilities::BalloonModuleCommonUtilities()
 {
     // do nothing
 }
 
-double BalloonModule::getAltitude()
+double BalloonModuleCommonUtilities::getAltitude()
 {
     // TODO altitude function for Balloonduino
 }
 
-double BalloonModule::getTemperature()
+double BalloonModuleCommonUtilities::getTemperature()
 {
     // TODO temperature function for Balloonduino
 }
 
-double BalloonModule::getPressure()
+double BalloonModuleCommonUtilities::getPressure()
 {
     // TODO pressure function for Balloonduino
 }
@@ -30,7 +30,7 @@ double BalloonModule::getPressure()
 
 // Given a meter value, prints meters and feet equivalent to the console without newline
 // for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
-void BalloonModule::printMetersAndFeet(double meters)
+void BalloonModuleCommonUtilities::printMetersAndFeet(double meters)
 {
     Serial.print(meters);
     Serial.print(" meters (");
@@ -59,7 +59,7 @@ void printPascalsAndAtmospheres(double pascals)
 }
 
 // prints current altitude in meters and feet
-void BalloonModule::printAltitude()
+void BalloonModuleCommonUtilities::printAltitude()
 {
     Serial.print("Altitude is ");
     printMetersAndFeet (altitude);
@@ -67,7 +67,7 @@ void BalloonModule::printAltitude()
 }
 
 // prints current temperature in Celsius and Fahrenheit
-void BalloonModule::printTemperature()
+void BalloonModuleCommonUtilities::printTemperature()
 {
     Serial.print("Temperature is ");
     printCelsiusAndFahrenheit (temperature);
@@ -75,7 +75,7 @@ void BalloonModule::printTemperature()
 }
 
 // prints current pressure in millibars
-void BalloonModule::printPressure()
+void BalloonModuleCommonUtilities::printPressure()
 {
     Serial.print("Pressure is ");
     printPascalsAndAtmospheres (pressure);
@@ -83,7 +83,7 @@ void BalloonModule::printPressure()
 }
 
 // Prints current millisecond time in [HH:MM:SS] without newline
-void BalloonModule::printFormattedTime()
+void BalloonModuleCommonUtilities::printFormattedTime()
 {
     milliseconds = millis() / 1000;    // convert from milliseconds to seconds
     seconds = milliseconds % 60;
@@ -112,7 +112,7 @@ void BalloonModule::printFormattedTime()
 }
 
 // Prints current status of module to console
-void BalloonModule::printStatusNow()
+void BalloonModuleCommonUtilities::printStatusNow()
 {
     altitude = getAltitude();
     // TODO 
@@ -122,7 +122,7 @@ void BalloonModule::printStatusNow()
 }
 
 // prints status only after launch, otherwise does nothing
-void BalloonModule::printStatusDuringFlight()
+void BalloonModuleCommonUtilities::printStatusDuringFlight()
 {
     if (isLaunched)
     {
