@@ -118,9 +118,13 @@ void BalloonModuleCommonUtilities::printFormattedTime()
 void BalloonModuleCommonUtilities::printStatusNow()
 {
     altitude = getAltitude();
-    // TODO 
+    temperature = getTemperature();
+    pressure = getPressure();
+    
     printFormattedTime();
     printAltitude();
+    printTemperature();
+    printPressure();
     Serial.println();
 }
 
