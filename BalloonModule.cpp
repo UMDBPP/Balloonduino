@@ -1,10 +1,6 @@
 /*
  * BalloonModule.cpp
- * balloon module: Arduino Uno with SFE_BMP180 pressure sensor attached
- * green -> SDA
- * blue -> SCL
- * white -> 3.3v
- * black -> GND
+ * balloonduino: modified Arduino Mega
  */
 
 #include <BalloonModule.h>
@@ -15,53 +11,85 @@ BalloonModule::BalloonModule()
     // do nothing
 }
 
-// Prints altitude, returns altitude
-void BalloonModule::printStatus()
+double BalloonModule::getAltitude()
 {
-    altitude = getAltitude();
-    printTime();
-    printAltitude();
-    Serial.println();
+    // TODO altitude function for Balloonduino
 }
 
-// Same as printStatus, but only starts once launch is detected
-void BalloonModule::printStatusAfterLaunch()
+double BalloonModule::getTemperature()
 {
-    if (isLaunched)
-    {
-        altitude = printStatus();
-    }
-    else
-    {
-        // Get the relative altitude difference between the new reading and the baseline reading
-        altitude = getAltitude();
-        
-        // Check if current altitude is high enough to resume output (launch detected)
-        if (altitude > 20.0)
-        {
-            launchTolerance++;
-        }
-        else
-        {
-            launchTolerance = 0;
-        }
-        if (launchTolerance > 5)
-        {
-            isLaunched = true;
-            printTime();
-            Serial.println("Launch detected. Resuming output.");
-        }
-    }
-    delay (delayMilliseconds);
+    // TODO temperature function for Balloonduino
 }
 
-// Prints time in [HH:MM:SS]. Use this at the beginning of output lines to make it more readable
-void BalloonModule::printTime()
+double BalloonModule::getPressure()
 {
-    MET = millis() / 1000;    // convert from milliseconds to seconds
-    seconds = MET % 60;
-    minutes = MET / 60;
+    // TODO pressure function for Balloonduino
+}
+
+// TODO other Balloonduino sensors
+
+// Given a meter value, prints meters and feet equivalent to the console without newline
+// for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
+void BalloonModule::printMetersAndFeet(double meters)
+{
+    Serial.print(meters);
+    Serial.print(" meters (");
+    Serial.print(meters * 3.28084);
+    Serial.print(" feet)");
+}
+
+// Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
+// for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
+void printCelsiusAndFahrenheit(double celsius)
+{
+    Serial.print(celsius);
+    Serial.print(" Celsius (");
+    Serial.print(celsius * 1.8 + 32);
+    Serial.print(" Fahrenheit)");
+}
+
+// Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
+// for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
+void printPascalsAndAtmospheres(double pascals)
+{
+    Serial.print(pascals);
+    Serial.print(" Pascals (");
+    Serial.print(pascals / 101325);
+    Serial.print(" atm)");
+}
+
+// prints current altitude in meters and feet
+void BalloonModule::printAltitude()
+{
+    Serial.print("Altitude is ");
+    printMetersAndFeet (altitude);
+    Serial.print(" above launch site. ");
+}
+
+// prints current temperature in Celsius and Fahrenheit
+void BalloonModule::printTemperature()
+{
+    Serial.print("Temperature is ");
+    printCelsiusAndFahrenheit (temperature);
+    Serial.print(". ");
+}
+
+// prints current pressure in millibars
+void BalloonModule::printPressure()
+{
+    Serial.print("Pressure is ");
+    printPascalsAndAtmospheres (pressure);
+    Serial.print(". ");
+}
+
+// Prints current millisecond time in [HH:MM:SS] without newline
+void BalloonModule::printFormattedTime()
+{
+    milliseconds = millis() / 1000;    // convert from milliseconds to seconds
+    seconds = milliseconds % 60;
+    minutes = milliseconds / 60;
     hours = minutes / 60;
+    
     Serial.print("[");
     if (hours < 10)
     {
@@ -83,19 +111,43 @@ void BalloonModule::printTime()
     Serial.print("] ");
 }
 
-// Prints meters and feet equivalent to the console; for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
-void BalloonModule::printMetersAndFeet(double meters)
+// Prints current status of module to console
+void BalloonModule::printStatusNow()
 {
-    Serial.print(meters);
-    Serial.print(" meters (");
-    Serial.print(meters * 3.28084);
-    Serial.print(" feet)");
+    altitude = getAltitude();
+    // TODO 
+    printFormattedTime();
+    printAltitude();
+    Serial.println();
 }
 
-// prints current altitude in meters and feet
-void BalloonModule::printAltitude()
+// prints status only after launch, otherwise does nothing
+void BalloonModule::printStatusDuringFlight()
 {
-    Serial.print("Altitude is ");
-    printMetersAndFeet (altitude);
-    Serial.print(" above launch site. ");
+    if (isLaunched)
+    {
+        altitude = printStatusNow();
+    }
+    else
+    {
+        // Get the relative altitude difference between the new reading and the baseline reading
+        altitude = getAltitude();
+        
+        // Check if current altitude is high enough to resume output (launch detected)
+        if (altitude > 20.0)
+        {
+            launchTolerance++;
+        }
+        else
+        {
+            launchTolerance = 0;
+        }
+        if (launchTolerance > 5)
+        {
+            isLaunched = true;
+            printFormattedTime();
+            Serial.println("Launch detected. Resuming output.");
+        }
+    }
+    delay (delayMilliseconds);
 }

@@ -15,15 +15,19 @@ class BalloonModule
 {
     public:
         BalloonModule();
-        void printStatus();
-        void printStatusAfterLaunch();
-        void printTime();
-        void printMetersAndFeet(double value);
+        double getAltitude();
+        double getTemperature();
+        double getPressure();
+        void printMetersAndFeet(double meters);
+        void printCelsiusAndFahrenheit(double celsius);
         void printAltitude();
+        void printTemperature();
+        void printPressure();
+        void printFormattedTime();
+        void printStatusNow();
+        void printStatusDuringFlight();
     private:
-        int MET;
-        byte hours = 0, minutes = 0, seconds = 0;
-        unsigned long millisecondTime = 0;
-        const int delayMilliseconds = 1000;    // time in milliseconds to delay (wait) each repetition
-        int launchTolerance = 0;
+        unsigned long milliseconds, delayMilliseconds = 1000;
+        byte hours = 0, minutes = 0, seconds = 0, launchTolerance = 0;
+        double altitude, temperature;
 };
