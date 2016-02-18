@@ -5,93 +5,113 @@
 
 #include <Balloonduino.h>
 
-// Base library type
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+// define pins
+#define BME_SCK 13
+#define BME_MISO 12
+#define BME_MOSI 11
+#define BME_CS 10
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME280 BME280;
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO,  BME_SCK);
+
 Balloonduino::Balloonduino()
 {
-    milliseconds = 0;
-    delayMilliseconds = 1000;
-    hours = 0;
-    minutes = 0;
-    seconds = 0;
-    launchTolerance = 0;
-    altitude = 0;
-    temperature = 0;
-    pressure = 0;
-    isLaunched = false;
-}
+    Serial.begin(9600);
 
-double Balloonduino::getAltitude()
-{
-    // TODO altitude function for Balloonduino
-    return altitude;
+    delayMilliseconds = 1000;
+    isLaunched = false;
+
+    Serial.println("Initializing BME280...");
+
+    if (BME280.begin())
+    {
+        Serial.println("BME280 initialized successfully.");
+        Serial.println("Now attempting baseline pressure reading...");
+    }
+    else
+    {
+        Serial.println("BME280 failed (is it disconnected?)");
+        Serial.println("System going to sleep.");
+        while (1)
+        {
+            // infinite loop to pause forever
+        }
+    }
+    // Get baseline pressure
+    baselinePressure = getPressure();
+
+    // Print baseline pressure and temperature
+    Serial.print("Baseline pressure is ");
+    Serial.print(baselinePressure);
+    Serial.println(" mb.");
+    Serial.print("Temperature is ");
+    Serial.print(temperature);
+    Serial.println(" C.");
 }
 
 double Balloonduino::getTemperature()
 {
-    // TODO temperature function for Balloonduino
+    temperature = BME280.readTemperature();
     return temperature;
 }
 
 double Balloonduino::getPressure()
 {
-    // TODO pressure function for Balloonduino
+    getTemperature();
+    pressure = BME280.readPressure();
     return pressure;
 }
 
-// TODO other Balloonduino sensors
-
-// Given a meter value, prints meters and feet equivalent to the console without newline
-// for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
-void Balloonduino::printMetersAndFeet(double meters)
+double Balloonduino::getAltitude()
 {
-    Serial.print(meters);
-    Serial.print(" meters (");
-    Serial.print(meters * 3.28084);
-    Serial.print(" feet)");
+    getPressure();
+    altitude = BME280.readAltitude(SEALEVELPRESSURE_HPA);
+    return altitude;
 }
 
-// Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
-// for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
-void Balloonduino::printCelsiusAndFahrenheit(double celsius)
+double Balloonduino::getHumidity()
 {
-    Serial.print(celsius);
-    Serial.print(" Celsius (");
-    Serial.print(celsius * 1.8 + 32);
-    Serial.print(" Fahrenheit)");
-}
-
-// Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
-// for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
-void Balloonduino::printPascalsAndAtmospheres(double pascals)
-{
-    Serial.print(pascals);
-    Serial.print(" Pascals (");
-    Serial.print(pascals / 101325);
-    Serial.print(" atm)");
-}
-
-// prints current altitude in meters and feet
-void Balloonduino::printAltitude()
-{
-    Serial.print("Altitude is ");
-    printMetersAndFeet (altitude);
-    Serial.print(" above launch site. ");
+    humidity = BME280.readHumidity();
+    return humidity;
 }
 
 // prints current temperature in Celsius and Fahrenheit
-void Balloonduino::printTemperature()
+void Balloonduino::printTemperature(double celsius)
 {
-    Serial.print("Temperature is ");
-    printCelsiusAndFahrenheit (temperature);
-    Serial.print(". ");
+    Serial.print("Temperature ");
+    Serial.print(celsius);
+    Serial.print(" C");
 }
 
 // prints current pressure in millibars
-void Balloonduino::printPressure()
+void Balloonduino::printPressure(double millibars)
 {
-    Serial.print("Pressure is ");
-    printPascalsAndAtmospheres (pressure);
-    Serial.print(". ");
+    Serial.print("Pressure ");
+    Serial.print(millibars);
+    Serial.print(" mb");
+}
+
+// prints current altitude in meters and feet
+void Balloonduino::printAltitude(double meters)
+{
+    Serial.print("Altitude ");
+    Serial.print(meters);
+    Serial.print(" meters");
+}
+
+void Balloonduino::printHumidity(double percentage)
+{
+    Serial.print("Humidity ");
+    Serial.print(percentage);
+    Serial.print("%");
 }
 
 // Prints current millisecond time in [HH:MM:SS] without newline
@@ -126,31 +146,28 @@ void Balloonduino::printFormattedTime()
 // Prints current status of module to console
 void Balloonduino::printStatusNow()
 {
-    altitude = getAltitude();
-    temperature = getTemperature();
-    pressure = getPressure();
-
     printFormattedTime();
-    printAltitude();
-    printTemperature();
-    printPressure();
+    printTemperature (temperature);
+    Serial.print(" | ");
+    printAltitude (altitude);
+    Serial.print(" | ");
+    printPressure (pressure);
+    Serial.print(" | ");
+    printHumidity (humidity);
     Serial.println();
 }
 
 // prints status only after launch, otherwise does nothing
-void Balloonduino::printStatusDuringFlight()
+void Balloonduino::printStatusDuringFlight(double baselineAltitude)
 {
-    // Get the relative altitude difference between the new reading and the baseline reading
-    altitude = getAltitude();
     if (isLaunched)
     {
         printStatusNow();
     }
     else
     {
-
         // Check if current altitude is high enough to resume output (launch detected)
-        if (altitude > 20.0)
+        if ((altitude - baselineAltitude) > 20.0)
         {
             launchTolerance++;
         }
@@ -167,3 +184,34 @@ void Balloonduino::printStatusDuringFlight()
     }
     delay (delayMilliseconds);
 }
+
+// Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
+// for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
+void Balloonduino::printCelsiusAndFahrenheit(double celsius)
+{
+    Serial.print(celsius);
+    Serial.print(" Celsius (");
+    Serial.print(celsius * 1.8 + 32);
+    Serial.print(" Fahrenheit)");
+}
+
+// Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
+// for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
+void Balloonduino::printMillibarsAndAtmospheres(double millibars)
+{
+    Serial.print(millibars);
+    Serial.print(" mb (");
+    Serial.print(millibars / 1013.2501);
+    Serial.print(" atm)");
+}
+
+// Given a meter value, prints meters and feet equivalent to the console without newline
+// for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
+void Balloonduino::printMetersAndFeet(double meters)
+{
+    Serial.print(meters);
+    Serial.print(" meters (");
+    Serial.print(meters * 3.28084);
+    Serial.print(" feet)");
+}
+
