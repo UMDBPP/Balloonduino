@@ -1,29 +1,38 @@
 /*
- * BalloonModuleCommonUtilities.cpp
+ * Balloonduino.cpp
  * balloonduino: modified Arduino Mega
  */
 
-#include <BalloonModuleCommonUtilities.h>
+#include <Balloonduino.h>
 
 // Base library type
-BalloonModuleCommonUtilities::BalloonModuleCommonUtilities()
+Balloonduino::Balloonduino()
 {
-    // do nothing
+    milliseconds = 0;
+    delayMilliseconds = 1000;
+    hours = 0;
+    minutes = 0;
+    seconds = 0;
+    launchTolerance = 0;
+    altitude = 0;
+    temperature = 0;
+    pressure = 0;
+    isLaunched = false;
 }
 
-double BalloonModuleCommonUtilities::getAltitude()
+double Balloonduino::getAltitude()
 {
     // TODO altitude function for Balloonduino
     return altitude;
 }
 
-double BalloonModuleCommonUtilities::getTemperature()
+double Balloonduino::getTemperature()
 {
     // TODO temperature function for Balloonduino
     return temperature;
 }
 
-double BalloonModuleCommonUtilities::getPressure()
+double Balloonduino::getPressure()
 {
     // TODO pressure function for Balloonduino
     return pressure;
@@ -33,7 +42,7 @@ double BalloonModuleCommonUtilities::getPressure()
 
 // Given a meter value, prints meters and feet equivalent to the console without newline
 // for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
-void BalloonModuleCommonUtilities::printMetersAndFeet(double meters)
+void Balloonduino::printMetersAndFeet(double meters)
 {
     Serial.print(meters);
     Serial.print(" meters (");
@@ -43,7 +52,7 @@ void BalloonModuleCommonUtilities::printMetersAndFeet(double meters)
 
 // Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
 // for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
-void BalloonModuleCommonUtilities::printCelsiusAndFahrenheit(double celsius)
+void Balloonduino::printCelsiusAndFahrenheit(double celsius)
 {
     Serial.print(celsius);
     Serial.print(" Celsius (");
@@ -53,7 +62,7 @@ void BalloonModuleCommonUtilities::printCelsiusAndFahrenheit(double celsius)
 
 // Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
 // for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
-void BalloonModuleCommonUtilities::printPascalsAndAtmospheres(double pascals)
+void Balloonduino::printPascalsAndAtmospheres(double pascals)
 {
     Serial.print(pascals);
     Serial.print(" Pascals (");
@@ -62,7 +71,7 @@ void BalloonModuleCommonUtilities::printPascalsAndAtmospheres(double pascals)
 }
 
 // prints current altitude in meters and feet
-void BalloonModuleCommonUtilities::printAltitude()
+void Balloonduino::printAltitude()
 {
     Serial.print("Altitude is ");
     printMetersAndFeet (altitude);
@@ -70,7 +79,7 @@ void BalloonModuleCommonUtilities::printAltitude()
 }
 
 // prints current temperature in Celsius and Fahrenheit
-void BalloonModuleCommonUtilities::printTemperature()
+void Balloonduino::printTemperature()
 {
     Serial.print("Temperature is ");
     printCelsiusAndFahrenheit (temperature);
@@ -78,7 +87,7 @@ void BalloonModuleCommonUtilities::printTemperature()
 }
 
 // prints current pressure in millibars
-void BalloonModuleCommonUtilities::printPressure()
+void Balloonduino::printPressure()
 {
     Serial.print("Pressure is ");
     printPascalsAndAtmospheres (pressure);
@@ -86,13 +95,13 @@ void BalloonModuleCommonUtilities::printPressure()
 }
 
 // Prints current millisecond time in [HH:MM:SS] without newline
-void BalloonModuleCommonUtilities::printFormattedTime()
+void Balloonduino::printFormattedTime()
 {
     milliseconds = millis() / 1000;    // convert from milliseconds to seconds
     seconds = milliseconds % 60;
     minutes = milliseconds / 60;
     hours = minutes / 60;
-    
+
     Serial.print("[");
     if (hours < 10)
     {
@@ -115,12 +124,12 @@ void BalloonModuleCommonUtilities::printFormattedTime()
 }
 
 // Prints current status of module to console
-void BalloonModuleCommonUtilities::printStatusNow()
+void Balloonduino::printStatusNow()
 {
     altitude = getAltitude();
     temperature = getTemperature();
     pressure = getPressure();
-    
+
     printFormattedTime();
     printAltitude();
     printTemperature();
@@ -129,17 +138,17 @@ void BalloonModuleCommonUtilities::printStatusNow()
 }
 
 // prints status only after launch, otherwise does nothing
-void BalloonModuleCommonUtilities::printStatusDuringFlight()
+void Balloonduino::printStatusDuringFlight()
 {
+    // Get the relative altitude difference between the new reading and the baseline reading
+    altitude = getAltitude();
     if (isLaunched)
     {
-        altitude = printStatusNow();
+        printStatusNow();
     }
     else
     {
-        // Get the relative altitude difference between the new reading and the baseline reading
-        altitude = getAltitude();
-        
+
         // Check if current altitude is high enough to resume output (launch detected)
         if (altitude > 20.0)
         {
