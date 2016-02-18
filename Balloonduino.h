@@ -1,12 +1,21 @@
 /*
- * BalloonModuleCommonUtilities.h
+ * Balloonduino.h
  * balloonduino: modified Arduino Mega
  */
 
-class BalloonModuleCommonUtilities
+#ifndef Balloonduino_h
+#define Balloonduino_h
+
+#if defined(ARDUINO) && ARDUINO >= 100
+#include "Arduino.h"
+#else
+#include "WProgram.h"
+#endif
+
+class Balloonduino
 {
     public:
-        BalloonModuleCommonUtilities();
+        Balloonduino();
         double getAltitude();
         double getTemperature();
         double getPressure();
@@ -20,7 +29,10 @@ class BalloonModuleCommonUtilities
         void printStatusNow();
         void printStatusDuringFlight();
     private:
-        unsigned long milliseconds = 0, delayMilliseconds = 1000;
-        byte hours = 0, minutes = 0, seconds = 0, launchTolerance = 0;
-        double altitude = 0, temperature = 0, pressure = 0;
+        unsigned long milliseconds, delayMilliseconds;
+        byte hours, minutes, seconds, launchTolerance;
+        double altitude, temperature, pressure;
+        bool isLaunched;
 };
+
+#endif
