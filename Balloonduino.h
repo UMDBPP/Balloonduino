@@ -8,14 +8,36 @@
 
 #include <Arduino.h>
 
+#ifdef useBME280
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+// define pins
+#define BME_SCK 13
+#define BME_MISO 12
+#define BME_MOSI 11
+#define BME_CS 10
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME280 BME280;
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO,  BME_SCK);
+#endif
+
 class Balloonduino
 {
     public:
-        Balloonduino();
+#ifdef useBME280
         double getTemperature();
         double getPressure();
         double getAltitude();
         double getHumidity();
+#endif
+        Balloonduino();
+        void begin();
         void printTemperature(double celsius);
         void printPressure(double millibars);
         void printAltitude(double meters);
@@ -27,9 +49,9 @@ class Balloonduino
         void printMillibarsAndAtmospheres(double millibars);
         void printMetersAndFeet(double meters);
     private:
+        double altitude, temperature, pressure, baselinePressure, humidity;
         unsigned long milliseconds, delayMilliseconds;
         byte hours, minutes, seconds, launchTolerance;
-        double altitude, temperature, pressure, baselinePressure, humidity;
         bool isLaunched = false;
 };
 
