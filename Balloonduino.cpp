@@ -71,26 +71,26 @@ void Balloonduino::printPascalsAndAtmospheres(double pascals)
 }
 
 // prints current altitude in meters and feet
-void Balloonduino::printAltitude()
+void Balloonduino::printAltitude(double altitude)
 {
     Serial.print("Altitude is ");
-    printMetersAndFeet (altitude);
+    printMetersAndFeet(altitude);
     Serial.print(" above launch site. ");
 }
 
 // prints current temperature in Celsius and Fahrenheit
-void Balloonduino::printTemperature()
+void Balloonduino::printTemperature(double temperature)
 {
     Serial.print("Temperature is ");
-    printCelsiusAndFahrenheit (temperature);
+    printCelsiusAndFahrenheit(temperature);
     Serial.print(". ");
 }
 
 // prints current pressure in millibars
-void Balloonduino::printPressure()
+void Balloonduino::printPressure(double pressure)
 {
     Serial.print("Pressure is ");
-    printPascalsAndAtmospheres (pressure);
+    printPascalsAndAtmospheres(pressure);
     Serial.print(". ");
 }
 
@@ -131,9 +131,9 @@ void Balloonduino::printStatusNow()
     pressure = getPressure();
 
     printFormattedTime();
-    printAltitude();
-    printTemperature();
-    printPressure();
+    printAltitude (altitude);
+    printTemperature (temperature);
+    printPressure (pressure);
     Serial.println();
 }
 

@@ -22,9 +22,9 @@ class Balloonduino
         void printMetersAndFeet(double meters);
         void printCelsiusAndFahrenheit(double celsius);
         void printPascalsAndAtmospheres(double pascals);
-        void printAltitude();
-        void printTemperature();
-        void printPressure();
+        void printAltitude(double altitude);
+        void printTemperature(double temperature);
+        void printPressure(double pressure);
         void printFormattedTime();
         void printStatusNow();
         void printStatusDuringFlight();
