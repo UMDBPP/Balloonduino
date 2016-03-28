@@ -6,16 +6,21 @@
 #ifndef Balloonduino_h
 #define Balloonduino_h
 
+#include <Adafruit_BNO055>
+
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
 #else
 #include "WProgram.h"
 #endif
 
+Adafruit_BNO055 BNO055;
+
 class Balloonduino
 {
     public:
         Balloonduino();
+        void begin();
         double getAltitude();
         double getTemperature();
         double getPressure();
