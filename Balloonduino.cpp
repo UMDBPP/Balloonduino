@@ -53,7 +53,7 @@ double Balloonduino::getPressure()
 double Balloonduino::getAltitude()
 {
     getPressure();
-    altitude = BME280.readAltitude();
+    altitude = BME280.readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
     return altitude;
 }
 
