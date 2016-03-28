@@ -146,8 +146,18 @@ void Balloonduino::printHumidity(double percentage)
     Serial.print("%");
 }
 
-// Prints current millisecond time in [HH:MM:SS] without newline
 void Balloonduino::printFormattedTime()
+{
+    Serial.print("Current time is ");
+    Serial.print(DS1307.now().hour(), DEC);
+    Serial.print(":");
+    Serial.print(DS1307.now().minute(), DEC);
+    Serial.print(":");
+    Serial.print(DS1307.now().second(), DEC);
+}
+
+// Prints current millisecond time from power on to present in [HH:MM:SS] without newline
+void Balloonduino::printMET()
 {
     milliseconds = millis() / 1000;    // convert from milliseconds to seconds
     seconds = milliseconds % 60;
