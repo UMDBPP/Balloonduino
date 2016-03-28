@@ -9,7 +9,7 @@
 #include <Arduino.h>
 
 #ifdef useBME280
-#include <BME280.h>
+#include <Adafruit_BME280.h>
 
 // define pins
 #define BME_SCK 13
