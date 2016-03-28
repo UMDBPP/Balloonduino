@@ -52,6 +52,37 @@ void Balloonduino::begin()
             // infinite loop to pause forever
         }
     }
+
+    Serial.println("Initializing DS1307...");
+
+    if (DS1307.begin())
+    {
+        Serial.println("DS1307 initialized successfully.");
+    }
+    else
+    {
+        Serial.println("DS1307 failed (is it disconnected?)");
+        Serial.println("System going to sleep.");
+        while (1)
+        {
+            // infinite loop to pause forever
+        }
+    }
+
+    if (!DS1307.isrunning())
+    {
+        Serial.println("DS1307 is NOT running!");
+        // following line sets the RTC to the date & time this sketch was compiled
+        DS1307.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        // This line sets the RTC with an explicit date & time, for example to set
+        // January 21, 2014 at 3am you would call:
+        // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    }
+    else
+    {
+        startTime = DS1307.now();
+        printFormattedTime();
+    }
 }
 
 double Balloonduino::getTemperature()
