@@ -5,7 +5,6 @@
 
 #include <Balloonduino.h>
 
-#ifdef useBME280
 void Balloonduino::begin()
 {
     delayMilliseconds = 1000;
@@ -63,7 +62,6 @@ double Balloonduino::getHumidity()
     humidity = BME280.readHumidity();
     return humidity;
 }
-#endif
 
 Balloonduino::Balloonduino()
 {

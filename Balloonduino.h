@@ -8,7 +8,6 @@
 
 #include <Arduino.h>
 
-#ifdef useBME280
 #include <Adafruit_BME280.h>
 
 // define pins
@@ -20,17 +19,14 @@
 Adafruit_BME280 BME280;
 //Adafruit_BME280 bme(BME_CS); // hardware SPI
 //Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO,  BME_SCK);
-#endif
 
 class Balloonduino
 {
     public:
-#ifdef useBME280
         double getTemperature();
         double getPressure();
         double getAltitude();
         double getHumidity();
-#endif
         Balloonduino();
         void begin();
         void printTemperature(double celsius);
