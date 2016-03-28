@@ -9,6 +9,7 @@
 #include <Arduino.h>
 
 #include <Adafruit_BME280.h>
+#include <Adafruit_BNO055.h>
 
 // define pins
 #define BME_SCK 13
@@ -16,6 +17,7 @@
 #define BME_MOSI 11
 #define BME_CS 10
 
+Adafruit_BNO055 BNO055;
 Adafruit_BME280 BME280;
 //Adafruit_BME280 bme(BME_CS); // hardware SPI
 //Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO,  BME_SCK);

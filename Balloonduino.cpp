@@ -36,6 +36,22 @@ void Balloonduino::begin()
     Serial.print("Temperature is ");
     Serial.print(temperature);
     Serial.println(" C.");
+
+    Serial.println("Initializing BNO055...");
+
+    if (BNO055.begin())
+    {
+        Serial.println("BNO055 initialized successfully.");
+    }
+    else
+    {
+        Serial.println("BNO055 failed (is it disconnected?)");
+        Serial.println("System going to sleep.");
+        while (1)
+        {
+            // infinite loop to pause forever
+        }
+    }
 }
 
 double Balloonduino::getTemperature()
