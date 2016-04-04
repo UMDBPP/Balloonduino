@@ -7,7 +7,6 @@
 
 void Balloonduino::begin()
 {
-    delayMilliseconds = 1000;
     isLaunched = false;
 
     Serial.println("Initializing BME280...");
@@ -34,7 +33,7 @@ void Balloonduino::begin()
     Serial.print(baselinePressure);
     Serial.println(" mb.");
     Serial.print("Temperature is ");
-    Serial.print(temperature);
+    Serial.print(getTemperature());
     Serial.println(" C.");
 
     Serial.println("Initializing BNO055...");
@@ -81,20 +80,18 @@ void Balloonduino::begin()
     else
     {
         startTime = DS1307.now();
-        printFormattedTime();
+        printRealTime();
     }
 }
 
 double Balloonduino::getTemperature()
 {
-    temperature = BME280.readTemperature();
-    return temperature;
+    return BME280.readTemperature();
 }
 
 double Balloonduino::getPressure()
 {
-    pressure = BME280.readPressure();
-    return pressure;
+    return BME280.readPressure();
 }
 
 double Balloonduino::getAltitude()
@@ -106,58 +103,54 @@ double Balloonduino::getAltitude()
 
 double Balloonduino::getHumidity()
 {
-    humidity = BME280.readHumidity();
-    return humidity;
+    return BME280.readHumidity();
 }
 
-// prints current temperature in Celsius and Fahrenheit
 void Balloonduino::printTemperature(double celsius)
 {
-    Serial.print("Temperature ");
+    Serial.print("T ");
     Serial.print(celsius);
-    Serial.print(" C");
+    Serial.print("C. ");
 }
 
-// prints current pressure in millibars
 void Balloonduino::printPressure(double millibars)
 {
-    Serial.print("Pressure ");
+    Serial.print("P ");
     Serial.print(millibars);
-    Serial.print(" mb");
+    Serial.print("mb. ");
 }
 
-// prints current altitude in meters and feet
 void Balloonduino::printAltitude(double meters)
 {
-    Serial.print("Altitude ");
+    Serial.print("A ");
     Serial.print(meters);
-    Serial.print(" meters");
+    Serial.print("m. ");
 }
 
 void Balloonduino::printHumidity(double percentage)
 {
-    Serial.print("Humidity ");
+    Serial.print("H ");
     Serial.print(percentage);
-    Serial.print("%");
+    Serial.print("%. ");
 }
 
-void Balloonduino::printFormattedTime()
+// prints time of day as [HH:MM:SS]
+void Balloonduino::printRealTime()
 {
-    Serial.print("Current time is ");
+    Serial.print("[");
     Serial.print(DS1307.now().hour(), DEC);
     Serial.print(":");
     Serial.print(DS1307.now().minute(), DEC);
     Serial.print(":");
     Serial.print(DS1307.now().second(), DEC);
+    Serial.print("] ");
 }
 
-// Prints current millisecond time from power on to present in [HH:MM:SS] without newline
-void Balloonduino::printMET()
+// Prints current millisecond time as [HH:MM:SS]
+void Balloonduino::printMissionTime()
 {
-    milliseconds = millis() / 1000;    // convert from milliseconds to seconds
-    seconds = milliseconds % 60;
-    minutes = milliseconds / 60;
-    hours = minutes / 60;
+    byte seconds = millis() % 60, minutes = millis() / 60;
+    byte hours = minutes / 60;
 
     Serial.print("[");
     if (hours < 10)
@@ -180,18 +173,18 @@ void Balloonduino::printMET()
     Serial.print("] ");
 }
 
-// Prints current status of module to console
-void Balloonduino::printStatusNow()
+// Prints status report to console
+void Balloonduino::printStatus()
 {
-    printFormattedTime();
-    printTemperature (temperature);
-    Serial.print(" | ");
-    printAltitude (altitude);
-    Serial.print(" | ");
-    printPressure (pressure);
-    Serial.print(" | ");
-    printHumidity (humidity);
-    Serial.println();
+    printRealTime();
+    printTemperature (getTemperature());Serial
+    .print(" | ");
+    printAltitude (getAltitude());Serial
+    .print(" | ");
+    printPressure (getPressure());Serial
+    .print(" | ");
+    printHumidity (getHumidity());Serial
+    .println();
 }
 
 // prints status only after launch, otherwise does nothing
@@ -199,11 +192,11 @@ void Balloonduino::printStatusDuringFlight()
 {
     if (isLaunched)
     {
-        printStatusNow();
+        printStatus();
     }
     else
     {
-        // Check if current altitude is high enough to resume output (launch detected)
+        // Check if current altitude is high enough to resume output
         if ((altitude - baselineAltitude) > 20.0)
         {
             launchTolerance++;
@@ -215,40 +208,9 @@ void Balloonduino::printStatusDuringFlight()
         if (launchTolerance > 5)
         {
             isLaunched = true;
-            printFormattedTime();
+            printRealTime();
             Serial.println("Launch detected. Resuming output.");
         }
     }
     delay (delayMilliseconds);
 }
-
-// Given a Celsius value, prints Celsius and Fahrenheit equivalent to the console without newline
-// for example, printCelsiusAndFahrenheit(20.0) prints "20.0 Celsius (68.0 Fahrenheit)"
-void Balloonduino::printCelsiusAndFahrenheit(double celsius)
-{
-    Serial.print(celsius);
-    Serial.print(" Celsius (");
-    Serial.print(celsius * 1.8 + 32);
-    Serial.print(" Fahrenheit)");
-}
-
-// Given a Pascal value, prints Pascals and atmospheres equivalent to the console without newline
-// for example, printPascalsAndAtmospheres(101325) prints "101325 Pascals (1 atm)"
-void Balloonduino::printMillibarsAndAtmospheres(double millibars)
-{
-    Serial.print(millibars);
-    Serial.print(" mb (");
-    Serial.print(millibars / 1013.2501);
-    Serial.print(" atm)");
-}
-
-// Given a meter value, prints meters and feet equivalent to the console without newline
-// for example, printMetersAndFeet(20000) prints "20000 meters (65616.96 feet)"
-void Balloonduino::printMetersAndFeet(double meters)
-{
-    Serial.print(meters);
-    Serial.print(" meters (");
-    Serial.print(meters * 3.28084);
-    Serial.print(" feet)");
-}
-

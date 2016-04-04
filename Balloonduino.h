@@ -36,18 +36,14 @@ class Balloonduino
         void printPressure(double millibars);
         void printAltitude(double meters);
         void printHumidity(double percentage);
-        void printFormattedTime();
-        void printMET();
-        void printStatusNow();
+        void printRealTime();
+        void printMissionTime();
+        void printStatus();
         void printStatusDuringFlight();
-        void printCelsiusAndFahrenheit(double celsius);
-        void printMillibarsAndAtmospheres(double millibars);
-        void printMetersAndFeet(double meters);
+
     private:
-        double altitude, baselineAltitude, temperature, pressure,
-                baselinePressure, humidity;
-        unsigned long milliseconds, delayMilliseconds;
-        byte hours, minutes, seconds, launchTolerance;
+        double baselineAltitude, baselinePressure;
+        byte launchTolerance;
         bool isLaunched = false;
         DateTime startTime;
 };
