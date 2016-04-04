@@ -110,11 +110,6 @@ double Balloonduino::getHumidity()
     return humidity;
 }
 
-Balloonduino::Balloonduino()
-{
-    // do nothing
-}
-
 // prints current temperature in Celsius and Fahrenheit
 void Balloonduino::printTemperature(double celsius)
 {
@@ -200,7 +195,7 @@ void Balloonduino::printStatusNow()
 }
 
 // prints status only after launch, otherwise does nothing
-void Balloonduino::printStatusDuringFlight(double baselineAltitude)
+void Balloonduino::printStatusDuringFlight()
 {
     if (isLaunched)
     {

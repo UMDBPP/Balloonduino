@@ -27,12 +27,11 @@ Adafruit_BME280 BME280;
 class Balloonduino
 {
     public:
+        void begin();
         double getTemperature();
         double getPressure();
         double getAltitude();
         double getHumidity();
-        Balloonduino();
-        void begin();
         void printTemperature(double celsius);
         void printPressure(double millibars);
         void printAltitude(double meters);
@@ -40,15 +39,17 @@ class Balloonduino
         void printFormattedTime();
         void printMET();
         void printStatusNow();
-        void printStatusDuringFlight(double baselineAltitude);
+        void printStatusDuringFlight();
         void printCelsiusAndFahrenheit(double celsius);
         void printMillibarsAndAtmospheres(double millibars);
         void printMetersAndFeet(double meters);
     private:
-        double altitude, temperature, pressure, baselinePressure, humidity;
+        double altitude, baselineAltitude, temperature, pressure,
+                baselinePressure, humidity;
         unsigned long milliseconds, delayMilliseconds;
         byte hours, minutes, seconds, launchTolerance;
         bool isLaunched = false;
+        DateTime startTime;
 };
 
 #endif
