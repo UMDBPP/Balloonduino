@@ -10,11 +10,11 @@ bool sensors[3] =
     { true, true, true };    // array for sensor status (running / error)
 
 // Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
-void displaySensorErrors()
+void displaySensorStatus()
 {
     digitalWrite(13, LOW);
     delay(500);
-    for (byte index; index < numberOfSensors; index++)
+    for (byte index; index < sizeof(sensors); index++)
     {
         digitalWrite(13, HIGH);
         delay(125);
@@ -117,7 +117,7 @@ double Balloonduino::getPressure()
 // Returns altitude double in meters
 double Balloonduino::getAltitude()
 {
-    return BME280.readAltitude();
+    return BME280.readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
 }
 
 // Returns humidity double in percentage
@@ -129,7 +129,7 @@ double Balloonduino::getHumidity()
 // Returns temperature string as "-60C"
 String Balloonduino::getTemperatureString()
 {
-    return String(getTemperature) + "C";
+    return String(getTemperature()) + "C";
 }
 
 // Returns pressure string as "500mb"
@@ -156,9 +156,23 @@ String Balloonduino::getMissionTimeString()
     byte seconds = millis() % 60, minutes = millis() / 60;
     byte hours = minutes / 60;
 
-    return "T+" + ((hours < 10) ? "0" : "") + String(hours) + ":"
-            + ((minutes < 10) ? "0" : "") + String(minutes) + ":"
-            + ((seconds < 10) ? "0" : "") + String(seconds);
+    String out = "T+";
+    if (hours < 10)
+    {
+        out += "0";
+    }
+    out += String(hours) + ":";
+    if (minutes < 10)
+    {
+        out += "0";
+    }
+    out += String(minutes) + ":";
+    if (seconds < 10)
+    {
+        out += "0";
+    }
+    out += String(seconds);
+    return out;
 }
 
 // Returns current time of day string as "hh:mm:ss a"
