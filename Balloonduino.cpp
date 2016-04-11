@@ -5,16 +5,43 @@
 
 #include <Balloonduino.h>
 
+// Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
+void displaySensorErrors()
+{
+    digitalWrite(13, LOW);
+    delay(500);
+    for (byte index; index < numberOfSensors; index++)
+    {
+        digitalWrite(13, HIGH);
+        delay(125);
+        digitalWrite(13, LOW);
+        delay(125);
+        if (sensors[index])
+        {
+            digitalWrite(13, HIGH);
+            delay(125);
+            digitalWrite(13, LOW);
+            delay(125);
+        }
+        else
+        {
+            delay(250);
+        }
+        delay(250);
+    }
+    delay(500);
+}
+
+// Initializes all sensors. Needs to be run before any measurements can be taken.
 void Balloonduino::begin()
 {
-    isLaunched = false;
-
-    Serial.println("Initializing BME280...");
-
+// initialize pressure / temperature / humidity sensor
+    Serial.println(
+            "Initializing BME280 pressure, temperature, and humidity sensor...");
     if (BME280.begin())
     {
         Serial.println("BME280 initialized successfully.");
-        Serial.println("Now attempting baseline pressure reading...");
+        Serial.println("Now attempting baseline reading...");
     }
     else
     {
@@ -22,22 +49,15 @@ void Balloonduino::begin()
         Serial.println("System going to sleep.");
         while (1)
         {
-            // infinite loop to pause forever
         }
     }
-    // Get baseline pressure
-    baselinePressure = getPressure();
+// Print baseline pressure and temperature
+    Serial.println("Pressure is " + getPressureString());
+    Serial.println("Temperature is " + getTemperatureString());
+    Serial println("Humidity is " + getHumidityString());
 
-    // Print baseline pressure and temperature
-    Serial.print("Baseline pressure is ");
-    Serial.print(baselinePressure);
-    Serial.println(" mb.");
-    Serial.print("Temperature is ");
-    Serial.print(getTemperature());
-    Serial.println(" C.");
-
-    Serial.println("Initializing BNO055...");
-
+// initialize orientation sensor
+    Serial.println("Initializing BNO055 orientation sensor...");
     if (BNO055.begin())
     {
         Serial.println("BNO055 initialized successfully.");
@@ -45,15 +65,11 @@ void Balloonduino::begin()
     else
     {
         Serial.println("BNO055 failed (is it disconnected?)");
-        Serial.println("System going to sleep.");
-        while (1)
-        {
-            // infinite loop to pause forever
-        }
+
     }
 
-    Serial.println("Initializing DS1307...");
-
+// initialize real time clock
+    Serial.println("Initializing DS1307 real time clock...");
     if (DS1307.begin())
     {
         Serial.println("DS1307 initialized successfully.");
@@ -67,7 +83,6 @@ void Balloonduino::begin()
             // infinite loop to pause forever
         }
     }
-
     if (!DS1307.isrunning())
     {
         Serial.println("DS1307 is NOT running!");
@@ -79,21 +94,23 @@ void Balloonduino::begin()
     }
     else
     {
-        startTime = DS1307.now();
-        printRealTime();
+        Serial.println("Current time is " + getRealTimeString());
     }
 }
 
+// Returns temperature double in degrees Celsius
 double Balloonduino::getTemperature()
 {
     return BME280.readTemperature();
 }
 
+// Returns pressure double in millibars
 double Balloonduino::getPressure()
 {
     return BME280.readPressure();
 }
 
+// Returns altitude double in meters
 double Balloonduino::getAltitude()
 {
     getPressure();
@@ -101,116 +118,64 @@ double Balloonduino::getAltitude()
     return altitude;
 }
 
+// Returns humidity double in percentage
 double Balloonduino::getHumidity()
 {
     return BME280.readHumidity();
 }
 
-void Balloonduino::printTemperature(double celsius)
+// Returns temperature string as "-60C"
+String Balloonduino::getTemperatureString()
 {
-    Serial.print("T ");
-    Serial.print(celsius);
-    Serial.print("C. ");
+    return String(getTemperature) + "C";
 }
 
-void Balloonduino::printPressure(double millibars)
+// Returns pressure string as "500mb"
+String Balloonduino::getPressureString()
 {
-    Serial.print("P ");
-    Serial.print(millibars);
-    Serial.print("mb. ");
+    return String(getPressure()) + "mb";
 }
 
-void Balloonduino::printAltitude(double meters)
+// Returns altitude string as "1050m"
+String Balloonduino::getAltitudeString()
 {
-    Serial.print("A ");
-    Serial.print(meters);
-    Serial.print("m. ");
+    return String(getAltitude()) + "m";
 }
 
-void Balloonduino::printHumidity(double percentage)
+// Returns humidity as "75%"
+String Balloonduino::getHumidityString()
 {
-    Serial.print("H ");
-    Serial.print(percentage);
-    Serial.print("%. ");
+    return String(getHumidity()) + "%";
 }
 
-// prints time of day as [HH:MM:SS]
-void Balloonduino::printRealTime()
-{
-    Serial.print("[");
-    Serial.print(DS1307.now().hour(), DEC);
-    Serial.print(":");
-    Serial.print(DS1307.now().minute(), DEC);
-    Serial.print(":");
-    Serial.print(DS1307.now().second(), DEC);
-    Serial.print("] ");
-}
-
-// Prints current millisecond time as [HH:MM:SS]
-void Balloonduino::printMissionTime()
+// Returns current millisecond time string as "T+HH:MM:SS"
+String Balloonduino::getMissionTimeString()
 {
     byte seconds = millis() % 60, minutes = millis() / 60;
     byte hours = minutes / 60;
 
-    Serial.print("[");
-    if (hours < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(hours);
-    Serial.print(":");
-    if (minutes < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(minutes);
-    Serial.print(":");
-    if (seconds < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(seconds);
-    Serial.print("] ");
+    return "T+" + ((hours < 10) ? "0" : "") + String(hours) + ":"
+            + ((minutes < 10) ? "0" : "") + String(minutes) + ":"
+            + ((seconds < 10) ? "0" : "") + String(seconds);
 }
 
-// Prints status report to console
-void Balloonduino::printStatus()
+// Returns current time of day string as "hh:mm:ss a"
+String Balloonduino::getRealTimeString()
 {
-    printRealTime();
-    printTemperature (getTemperature());Serial
-    .print(" | ");
-    printAltitude (getAltitude());Serial
-    .print(" | ");
-    printPressure (getPressure());Serial
-    .print(" | ");
-    printHumidity (getHumidity());Serial
-    .println();
+    return String(DS1307.now().hour()) + ":" + String(DS1307.now().minute())
+            + ":" + String(DS1307.now().second());
 }
 
-// prints status only after launch, otherwise does nothing
-void Balloonduino::printStatusDuringFlight()
+// Returns status report string as "[HH:MM:SS] | -60C | 1050m | 500mb | 75% |"
+String Balloonduino::getStatusString()
 {
-    if (isLaunched)
-    {
-        printStatus();
-    }
-    else
-    {
-        // Check if current altitude is high enough to resume output
-        if ((altitude - baselineAltitude) > 20.0)
-        {
-            launchTolerance++;
-        }
-        else
-        {
-            launchTolerance--;
-        }
-        if (launchTolerance > 5)
-        {
-            isLaunched = true;
-            printRealTime();
-            Serial.println("Launch detected. Resuming output.");
-        }
-    }
-    delay (delayMilliseconds);
+    return getRealTimeString() + getTemperatureString() + " | "
+            + getAltitudeString() + " | " + getPressureString() + " | "
+            + getHumidityString() + " | ";
+}
+
+// Private function, updates sensor status array
+void updateSensorStatus(byte address, bool status)
+{
+    sensors[address] = status;
 }
