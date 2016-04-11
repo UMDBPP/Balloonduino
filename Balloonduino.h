@@ -13,10 +13,10 @@
 #include <RTClib.h>
 
 // define pins
-#define BME_SCK 13
-#define BME_MISO 12
-#define BME_MOSI 11
-#define BME_CS 10
+#define BME_SCK 12
+#define BME_MISO 11
+#define BME_MOSI 10
+#define BME_CS 9
 
 class Balloonduino
 {
