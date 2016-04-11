@@ -5,6 +5,10 @@
 
 #include <Balloonduino.h>
 
+byte numberOfSensors = 3;
+bool sensors[3] =
+    { true, true, true };    // array for sensor status (running / error)
+
 // Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
 void displaySensorErrors()
 {
@@ -54,7 +58,7 @@ void Balloonduino::begin()
 // Print baseline pressure and temperature
     Serial.println("Pressure is " + getPressureString());
     Serial.println("Temperature is " + getTemperatureString());
-    Serial println("Humidity is " + getHumidityString());
+    Serial.println("Humidity is " + getHumidityString());
 
 // initialize orientation sensor
     Serial.println("Initializing BNO055 orientation sensor...");
@@ -113,9 +117,7 @@ double Balloonduino::getPressure()
 // Returns altitude double in meters
 double Balloonduino::getAltitude()
 {
-    getPressure();
-    altitude = BME280.readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
-    return altitude;
+    return BME280.readAltitude();
 }
 
 // Returns humidity double in percentage
