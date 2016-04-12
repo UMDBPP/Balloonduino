@@ -29,7 +29,7 @@ void Balloonduino::displaySensorStatus()
         }
         delay(250);
     }
-    delay(500);
+    delay(250);
 }
 
 // Initializes all sensors. Needs to be run before any measurements can be taken.
