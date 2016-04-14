@@ -31,10 +31,11 @@ class Balloonduino
         String getRealTimeString();
         String getStatusString();
     private:
-        void updateSensorStatus(byte address, bool status);
+        void updateSensorStatus(byte address, byte status);
+        void print(String message);
         byte numberOfSensors = 3;
-        bool sensors[3] =
-            { true, true, true };   // array for sensor status (running / error)
+        byte sensors[3] =
+            { 0, 0, 0 };   // array for sensor status (running / error)
         RTC_DS1307 DS1307;
         Adafruit_BNO055 BNO055;
         Adafruit_BME280 BME280;

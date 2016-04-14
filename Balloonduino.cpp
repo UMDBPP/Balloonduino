@@ -36,42 +36,43 @@ void Balloonduino::displaySensorStatus()
 void Balloonduino::begin()
 {
 // initialize pressure / temperature / humidity sensor
-    Serial.println(
-            "Initializing BME280 pressure, temperature, and humidity sensor...");
+    print("Initializing BME280 pressure, temperature, and humidity sensor...");
     if (BME280.begin())
     {
-        Serial.println("BME280 initialized successfully.");
-        Serial.println("Now attempting baseline reading...");
+        updateSensorStatus(0, 0);
+        print("BME280 initialized successfully.");
+        print("Now attempting baseline reading...");
 // Print baseline pressure and temperature
-        Serial.println("Pressure is " + getPressureString());
-        Serial.println("Temperature is " + getTemperatureString());
-        Serial.println("Humidity is " + getHumidityString());
+        print("Pressure is " + String(getPressure()) + "mb.");
+        print("Temperature is " + String(getTemperature()) + "C.");
+        print("Humidity is " + String(getHumidity()) + "%.");
     }
     else
     {
-        Serial.println("BME280 failed (is it disconnected?)");
-        updateSensorStatus(0, false);
+        updateSensorStatus(0, 1);
+        print("BME280 failed (is it disconnected?)");
     }
 
 // initialize orientation sensor
-    Serial.println("Initializing BNO055 orientation sensor...");
+    print("Initializing BNO055 orientation sensor...");
     if (BNO055.begin())
     {
-        Serial.println("BNO055 initialized successfully.");
+        updateSensorStatus(1, 0);
+        print("BNO055 initialized successfully.");
     }
     else
     {
-        Serial.println("BNO055 failed (is it disconnected?)");
-        updateSensorStatus(1, false);
+        updateSensorStatus(1, 1);
+        print("BNO055 failed (is it disconnected?)");
     }
 
 // initialize real time clock
-    Serial.println("Initializing DS1307 real time clock...");
+    print("Initializing DS1307 real time clock...");
     DS1307.begin();
     if (!DS1307.isrunning())
     {
-        Serial.println("DS1307 failed (is it disconnected?)");
-        updateSensorStatus(2, false);
+        print("DS1307 failed (is it disconnected?)");
+        updateSensorStatus(2, 1);
         // following line sets the RTC to the date & time this sketch was compiled
         DS1307.adjust(DateTime(F(__DATE__), F(__TIME__)));
         // This line sets the RTC with an explicit date & time, for example to set
@@ -80,10 +81,10 @@ void Balloonduino::begin()
     }
     else
     {
-        Serial.println("DS1307 initialized successfully.");
-        Serial.println("Current time is " + getRealTimeString());
+        print("DS1307 initialized successfully.");
+        print("Current time is " + getRealTimeString());
     }
-    Serial.println("Initialization completed. Check console for errors.");
+    print("Initialization completed. Check console for errors.");
 
     displaySensorStatus();
 }
@@ -147,13 +148,19 @@ String Balloonduino::getRealTimeString()
 // Returns status report string as "[HH:MM:SS] | -60C | 1050m | 500mb | 75% |"
 String Balloonduino::getStatusString()
 {
-    return getRealTimeString() + getTemperatureString() + " | "
-            + getAltitudeString() + " | " + getPressureString() + " | "
-            + getHumidityString() + " | ";
+    return getRealTimeString() + String(getTemperature()) + "C | "
+            + String(getAltitude()) + "m | " + String(getPressure()) + "mb | "
+            + String(getHumidity()) + "% | ";
+}
+
+// Private function, prints to serial
+void Balloonduino::print(String message)
+{
+    Serial.println("[" + getMissionTimeString() + "] " + message);
 }
 
 // Private function, updates sensor status array
-void updateSensorStatus(byte address, bool status)
+void Balloonduino::updateSensorStatus(byte address, byte status)
 {
     sensors[address] = status;
 }
