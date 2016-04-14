@@ -27,18 +27,14 @@ class Balloonduino
         double getPressure();
         double getAltitude();
         double getHumidity();
-        String getTemperatureString();
-        String getPressureString();
-        String getAltitudeString();
-        String getHumidityString();
         String getMissionTimeString();
         String getRealTimeString();
         String getStatusString();
     private:
-        void updateSensorStatus(byte address, byte status);
+        void updateSensorStatus(byte address, bool status);
         byte numberOfSensors = 3;
-        byte sensors[3] =
-            { 0, 0, 0 };   // array for sensor status (running / error)
+        bool sensors[3] =
+            { true, true, true };   // array for sensor status (running / error)
         RTC_DS1307 DS1307;
         Adafruit_BNO055 BNO055;
         Adafruit_BME280 BME280;
