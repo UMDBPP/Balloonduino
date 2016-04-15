@@ -6,33 +6,39 @@
 #ifndef Balloonduino_h
 #define Balloonduino_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
+#include <Arduino.h>
+
+#include <Adafruit_BME280.h>
+#include <Adafruit_BNO055.h>
+#include <RTClib.h>
+
+// define pins
+#define BME_SCK 12
+#define BME_MISO 11
+#define BME_MOSI 10
+#define BME_CS 9
 
 class Balloonduino
 {
     public:
-        Balloonduino();
-        double getAltitude();
+        void displaySensorStatus();
+        void begin();
         double getTemperature();
         double getPressure();
-        void printMetersAndFeet(double meters);
-        void printCelsiusAndFahrenheit(double celsius);
-        void printPascalsAndAtmospheres(double pascals);
-        void printAltitude(double altitude);
-        void printTemperature(double temperature);
-        void printPressure(double pressure);
-        void printFormattedTime();
-        void printStatusNow();
-        void printStatusDuringFlight();
+        double getAltitude();
+        double getHumidity();
+        String getMissionTimeString();
+        String getRealTimeString();
+        String getStatusString();
     private:
-        unsigned long milliseconds, delayMilliseconds;
-        byte hours, minutes, seconds, launchTolerance;
-        double altitude, temperature, pressure;
-        bool isLaunched;
+        void updateSensorStatus(byte address, byte status);
+        void print(String message);
+        byte numberOfSensors = 3;
+        byte sensors[3] =
+            { 0, 0, 0 };   // array for sensor status (running / error)
+        RTC_DS1307 DS1307;
+        Adafruit_BNO055 BNO055;
+        Adafruit_BME280 BME280;
 };
 
 #endif
