@@ -18,8 +18,6 @@
 #define BME_MOSI 10
 #define BME_CS 9
 
-#define SENSORS_PRESSURE_SEALEVELHPA (1013.25F)
-
 class Balloonduino
 {
     public:
