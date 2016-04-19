@@ -8,14 +8,20 @@
 // Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
 void Balloonduino::displaySensorStatus()
 {
+    // set built in LED to off for half a second
     digitalWrite(13, LOW);
     delay(500);
+
+    // iterate through the sensor statuses in the sensor status array
     for (byte index = 0; index < numberOfSensors; index++)
     {
+        // blink LED once for 125 millisecond interval
         digitalWrite(13, HIGH);
         delay(125);
         digitalWrite(13, LOW);
         delay(125);
+
+        // if sensor has an error, blink LED again, otherwise wait 250 milliseconds with LED off
         if (sensors[index])
         {
             digitalWrite(13, HIGH);
@@ -27,22 +33,26 @@ void Balloonduino::displaySensorStatus()
         {
             delay(250);
         }
+
+        // wait an additional 250 milliseconds between each sensor in the iteration
         delay(250);
     }
+
+    // wait an additional 250 milliseconds between each iteration completion and the start of the next iteration
     delay(250);
 }
 
-// Initializes all sensors. Needs to be run before any measurements can be taken.
+// Initializes all sensors. Needs to be run once in setup before any measurements can be taken.
 void Balloonduino::begin()
 {
-// initialize pressure / temperature / humidity sensor
+    // Initialize pressure / temperature / humidity sensor
     print("Initializing BME280 pressure, temperature, and humidity sensor...");
     if (BME280.begin())
     {
         updateSensorStatus(0, 0);
         print("BME280 initialized successfully.");
         print("Now attempting baseline reading...");
-// Print baseline pressure and temperature
+        // Print baseline pressure and temperature
         print("Pressure is " + String(getPressure()) + "mb.");
         print("Temperature is " + String(getTemperature()) + "C.");
         print("Humidity is " + String(getHumidity()) + "%.");
@@ -53,7 +63,7 @@ void Balloonduino::begin()
         print("BME280 failed (is it disconnected?)");
     }
 
-// initialize orientation sensor
+    // Initialize orientation sensor
     print("Initializing BNO055 orientation sensor...");
     if (BNO055.begin())
     {
@@ -66,54 +76,57 @@ void Balloonduino::begin()
         print("BNO055 failed (is it disconnected?)");
     }
 
-// initialize real time clock
+    // Initialize real time clock
     print("Initializing DS1307 real time clock...");
+
+    // RTCLib library will always return successful initialization, regardless of whether connected or not
     DS1307.begin();
+
+    // Query if it is running to get status
     if (!DS1307.isrunning())
     {
         print("DS1307 failed (is it disconnected?)");
         updateSensorStatus(2, 1);
+
         // following line sets the RTC to the date & time this sketch was compiled
         DS1307.adjust(DateTime(F(__DATE__), F(__TIME__)));
-        // This line sets the RTC with an explicit date & time, for example to set
-        // January 21, 2014 at 3am you would call:
-        // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
     }
     else
     {
         print("DS1307 initialized successfully.");
         print("Current time is " + getRealTimeString());
     }
-    print("Initialization completed. Check console for errors.");
 
+    // log completion and display sensor status for one iteration
+    print("Initialization completed. Check console for errors.");
     displaySensorStatus();
 }
 
-// Returns temperature double in degrees Celsius
+// Returns temperature as a double in degrees Celsius
 double Balloonduino::getTemperature()
 {
     return BME280.readTemperature();
 }
 
-// Returns pressure double in millibars
+// Returns pressure as adouble in millibars
 double Balloonduino::getPressure()
 {
     return BME280.readPressure();
 }
 
-// Returns altitude double in meters
+// Returns altitude as a double in meters
 double Balloonduino::getAltitude()
 {
     return BME280.readAltitude(SENSORS_PRESSURE_SEALEVELHPA);
 }
 
-// Returns humidity double in percentage
+// Returns humidity as a double in percentage
 double Balloonduino::getHumidity()
 {
     return BME280.readHumidity();
 }
 
-// Returns current millisecond time string as "T+HH:MM:SS"
+// Returns current millisecond time as a string in format "T+HH:MM:SS"
 String Balloonduino::getMissionTimeString()
 {
     byte seconds = millis() % 60, minutes = millis() / 60;
@@ -138,14 +151,14 @@ String Balloonduino::getMissionTimeString()
     return out;
 }
 
-// Returns current time of day string as "hh:mm:ss a"
+// Returns current time of day as a string in format "hh:mm:ss"
 String Balloonduino::getRealTimeString()
 {
     return String(DS1307.now().hour()) + ":" + String(DS1307.now().minute())
             + ":" + String(DS1307.now().second());
 }
 
-// Returns status report string as "[HH:MM:SS] | -60C | 1050m | 500mb | 75% |"
+// Returns status report as a string in format "[hh:mm:ss] | -60C | 1050m | 500mb | 75% |"
 String Balloonduino::getStatusString()
 {
     return getRealTimeString() + String(getTemperature()) + "C | "
