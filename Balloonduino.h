@@ -18,10 +18,11 @@
 #define BME_MOSI 10
 #define BME_CS 9
 
+#define SENSORS_PRESSURE_SEALEVELHPA (1013.25F)
+
 class Balloonduino
 {
     public:
-        void displaySensorStatus();
         void begin();
         double getTemperature();
         double getPressure();
@@ -29,13 +30,14 @@ class Balloonduino
         double getHumidity();
         String getMissionTimeString();
         String getRealTimeString();
-        String getStatusString();
+        String getSensorReadingsString();
+        void log(String message);
+        void displaySensorStatus();
     private:
         void updateSensorStatus(byte address, byte status);
-        void print(String message);
         byte numberOfSensors = 3;
         byte sensors[3] =
-            { 0, 0, 0 };   // array for sensor status (running / error)
+            { 0, 0, 0 };    // array for sensor status (good / bad)
         RTC_DS1307 DS1307;
         Adafruit_BNO055 BNO055;
         Adafruit_BME280 BME280;
