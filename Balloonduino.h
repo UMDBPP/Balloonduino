@@ -35,7 +35,7 @@ class Balloonduino
         void updateSensorStatus(byte address, byte status);
         byte numberOfSensors = 3;
         byte sensors[3] =
-            { 0, 0, 0 };    // array for sensor status (good / bad)
+            { 0, 0, 0 };   // array for sensor status (good / bad)
         RTC_DS1307 DS1307;
         Adafruit_BNO055 BNO055;
         Adafruit_BME280 BME280;
