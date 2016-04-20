@@ -5,73 +5,46 @@
 
 #include <Balloonduino.h>
 
-// Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
-void Balloonduino::displaySensorStatus()
-{
-    digitalWrite(13, LOW);
-    delay(500);
-    for (byte index = 0; index < numberOfSensors; index++)
-    {
-        digitalWrite(13, HIGH);
-        delay(125);
-        digitalWrite(13, LOW);
-        delay(125);
-        if (sensors[index])
-        {
-            digitalWrite(13, HIGH);
-            delay(125);
-            digitalWrite(13, LOW);
-            delay(125);
-        }
-        else
-        {
-            delay(250);
-        }
-        delay(250);
-    }
-    delay(250);
-}
-
-// Initializes all sensors. Needs to be run before any measurements can be taken.
+// Initializes all sensors. Needs to be run once in setup before any measurements can be taken.
 void Balloonduino::begin()
 {
-// initialize pressure / temperature / humidity sensor
-    print("Initializing BME280 pressure, temperature, and humidity sensor...");
+    // initialize pressure / temperature / humidity sensor
+    log("Initializing BME280 pressure, temperature, and humidity sensor...");
     if (BME280.begin())
     {
         updateSensorStatus(0, 0);
-        print("BME280 initialized successfully.");
-        print("Now attempting baseline reading...");
-// Print baseline pressure and temperature
-        print("Pressure is " + String(getPressure()) + "mb.");
-        print("Temperature is " + String(getTemperature()) + "C.");
-        print("Humidity is " + String(getHumidity()) + "%.");
+        log("BME280 initialized successfully.");
+        log("Now attempting baseline reading...");
+        // Print baseline pressure and temperature
+        log("Pressure is " + String(getPressure()) + "mb.");
+        log("Temperature is " + String(getTemperature()) + "C.");
+        log("Humidity is " + String(getHumidity()) + "%.");
     }
     else
     {
         updateSensorStatus(0, 1);
-        print("BME280 failed (is it disconnected?)");
+        log("BME280 failed (is it disconnected?)");
     }
 
-// initialize orientation sensor
-    print("Initializing BNO055 orientation sensor...");
+    // initialize orientation sensor
+    log("Initializing BNO055 orientation sensor...");
     if (BNO055.begin())
     {
         updateSensorStatus(1, 0);
-        print("BNO055 initialized successfully.");
+        log("BNO055 initialized successfully.");
     }
     else
     {
         updateSensorStatus(1, 1);
-        print("BNO055 failed (is it disconnected?)");
+        log("BNO055 failed (is it disconnected?)");
     }
 
-// initialize real time clock
-    print("Initializing DS1307 real time clock...");
+    // initialize real time clock
+    log("Initializing DS1307 real time clock...");
     DS1307.begin();
     if (!DS1307.isrunning())
     {
-        print("DS1307 failed (is it disconnected?)");
+        log("DS1307 failed (is it disconnected?)");
         updateSensorStatus(2, 1);
         // following line sets the RTC to the date & time this sketch was compiled
         DS1307.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -81,10 +54,10 @@ void Balloonduino::begin()
     }
     else
     {
-        print("DS1307 initialized successfully.");
-        print("Current time is " + getRealTimeString());
+        log("DS1307 initialized successfully.");
+        log("Current time is " + getRealTimeString());
     }
-    print("Initialization completed. Check console for errors.");
+    log("Initialization completed. Check console for errors.");
 
     displaySensorStatus();
 }
@@ -145,21 +118,48 @@ String Balloonduino::getRealTimeString()
             + ":" + String(DS1307.now().second());
 }
 
-// Returns status report string as "[HH:MM:SS] | -60C | 1050m | 500mb | 75% |"
-String Balloonduino::getStatusString()
+// Returns status report string as "[HH:MM:SS] | -60C | 1050m | 500mb | 75%"
+String Balloonduino::getSensorReadingsString()
 {
     return getRealTimeString() + String(getTemperature()) + "C | "
             + String(getAltitude()) + "m | " + String(getPressure()) + "mb | "
-            + String(getHumidity()) + "% | ";
+            + String(getHumidity()) + "%";
 }
 
-// Private function, prints to serial
-void Balloonduino::print(String message)
+// Logs message
+void Balloonduino::log(String message)
 {
     Serial.println("[" + getMissionTimeString() + "] " + message);
 }
 
-// Private function, updates sensor status array
+// Displays sensor errors to pin 13 (built in LED), blinks once for OK status, twice otherwise
+void Balloonduino::displaySensorStatus()
+{
+    digitalWrite(13, LOW);
+    delay(500);
+    for (byte index = 0; index < numberOfSensors; index++)
+    {
+        digitalWrite(13, HIGH);
+        delay(125);
+        digitalWrite(13, LOW);
+        delay(125);
+        if (sensors[index])
+        {
+            digitalWrite(13, HIGH);
+            delay(125);
+            digitalWrite(13, LOW);
+            delay(125);
+        }
+        else
+        {
+            delay(250);
+        }
+        delay(250);
+    }
+    delay(250);
+}
+
+// Private function, run to update sensor status array
 void Balloonduino::updateSensorStatus(byte address, byte status)
 {
     sensors[address] = status;
