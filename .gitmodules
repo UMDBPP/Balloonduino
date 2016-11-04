@@ -1,0 +1,3 @@
+[submodule "CCSDS_Xbee"]
+	path = CCSDS_Xbee
+	url = https://github.com/UMDBPP/CCSDS_Xbee.git
