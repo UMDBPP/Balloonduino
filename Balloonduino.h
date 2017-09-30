@@ -155,13 +155,21 @@ struct IMUData_s
 // environmental data
 struct ENVData_s
 {
+#ifndef BALLOONDUINO_NO_BME
         float bme_pres;
         float bme_temp;
         float bme_humid;
+#endif
+#ifndef BALLOONDUINO_NO_SSC
         float ssc_pres;
         float ssc_temp;
+#endif
+#ifndef BALLOONDUINO_NO_BNO
         float bno_temp;
+#endif
+#ifndef BALLOONDUINO_NO_MCP
         float mcp_temp;
+#endif
 };
 
 // power data
@@ -185,22 +193,8 @@ class Balloonduino
 {
     public:
         Balloonduino();
-        void printMetersAndFeet(double meters);
-        void printCelsiusAndFahrenheit(double celsius);
-        void printPascalsAndAtmospheres(double pascals);
-        void printAltitude();
-        void printTemperature();
-        void printPressure();
-        void printFormattedTime();
 
         void begin();
-
-        void command_response(uint8_t data[], uint8_t data_len, File file);
-        // pkt creation
-        uint16_t create_HK_pkt();
-        uint16_t create_IMU_pkt();
-        uint16_t create_PWR_pkt();
-        uint16_t create_ENV_pkt();
 
         // sensor reading
         void read_imu();
@@ -211,14 +205,20 @@ class Balloonduino
         void log_imu(File IMULogFile);
         void log_env(File ENVLogFile);
         void log_pwr(File PWRLogFile);
-        void print_time(File file);
-        void logPkt(File file, uint8_t data[], uint8_t len, uint8_t received_flg);
-        void xbee_send_and_log(uint8_t dest_addr, uint8_t data[], uint8_t data_len, File file);
-    private:
-        uint32_t milliseconds, delayMilliseconds;
-        byte hours, minutes, seconds, launchTolerance;
-        double altitude, temperature, pressure;bool isLaunched;
 
+        // pkt creation
+        uint16_t create_HK_pkt();
+        uint16_t create_IMU_pkt();
+        uint16_t create_PWR_pkt();
+        uint16_t create_ENV_pkt();
+
+        void command_response(uint8_t data[], uint8_t data_len, File file);
+
+        void xbee_send_and_log(uint8_t dest_addr, uint8_t data[], uint8_t data_len, File file);
+        void logPkt(File file, uint8_t data[], uint8_t len, uint8_t received_flg);
+
+        void print_time(File file);
+    private:
         IntCtr_s IntCtr;
         uint8_t OutPktBuf[MAX_PKT_LEN];
         uint8_t InPktBuf[MAX_PKT_LEN];

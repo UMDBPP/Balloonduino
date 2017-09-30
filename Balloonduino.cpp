@@ -8,261 +8,12 @@
 // Base library type
 Balloonduino::Balloonduino()
 {
-    milliseconds = 0;
-    delayMilliseconds = 1000;
-    hours = 0;
-    minutes = 0;
-    seconds = 0;
-    launchTolerance = 0;
-    altitude = 0;
-    temperature = 0;
-    pressure = 0;
-    isLaunched = false;
-}
-
-// TODO other Balloonduino sensors
-
-// Prints current millisecond time in [HH:MM:SS] without newline
-void Balloonduino::printFormattedTime()
-{
-    milliseconds = millis() / 1000;    // convert from milliseconds to seconds
-    seconds = milliseconds % 60;
-    minutes = milliseconds / 60;
-    hours = minutes / 60;
-
-    Serial.print("[");
-    if (hours < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(hours);
-    Serial.print(":");
-    if (minutes < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(minutes);
-    Serial.print(":");
-    if (seconds < 10)
-    {
-        Serial.print("0");
-    }
-    Serial.print(seconds);
-    Serial.print("] ");
-}
-
-// populates the IMUData struct with data from the BNO IMU
-void Balloonduino::read_imu()
-{
-#ifndef BALLONDUINO_NO_BNO
-    uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
-    bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
-
-    // get measurements
-    imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);    // (values in uT, micro Teslas)
-    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);    // (values in rps, radians per second)
-    imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);    // (values in m/s^2)
-
-    // assign them into structure fields
-    IMUData.system_cal = system_cal;
-    IMUData.accel_cal = accel_cal;
-    IMUData.gyro_cal = gyro_cal;
-    IMUData.mag_cal = mag_cal;
-    IMUData.accel_x = accel.x();
-    IMUData.accel_y = accel.y();
-    IMUData.accel_z = accel.z();
-    IMUData.gyro_x = gyro.x();
-    IMUData.gyro_y = gyro.y();
-    IMUData.gyro_z = gyro.z();
-    IMUData.mag_x = mag.x();
-    IMUData.mag_y = mag.y();
-    IMUData.mag_z = mag.z();
-#endif
-}
-
-// populates the PWRData struct with data from the ADS
-void Balloonduino::read_pwr()
-{
-#ifndef BALLONDUINO_NO_ADS
-    PWRData.batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606;    // V
-    PWRData.i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5) * 10;
-#endif
-}
-
-// populates the ENVData struct with data from the BME
-void Balloonduino::read_env()
-{
-#ifndef BALLONDUINO_NO_BME
-    //BME280
-    ENVData.bme_pres = bme.readPressure() / 100.0F;    // hPa
-    ENVData.bme_temp = bme.readTemperature();    // degC
-    ENVData.bme_humid = bme.readHumidity();    // %
-#else
-            ENVData.bme_pres = 0.0F;    // hPa
-            ENVData.bme_temp = 0.0F;// degC
-            ENVData.bme_humid = 0.0F;// %
-#endif
-
-    //  SSC
-#ifndef BALLONDUINO_NO_SSC
-    ssc.update();
-    ENVData.ssc_pres = ssc.pressure();    // PSI
-    ENVData.ssc_temp = ssc.temperature();    // degC
-#else
-            ENVData.ssc_pres = 0.0F;    // PSI
-            ENVData.ssc_temp = 0.0F;// degC
-#endif
-
-    // BNO
-#ifndef BALLONDUINO_NO_BNO
-    ENVData.bno_temp = bno.getTemp();
-#else
-    ENVData.bno_temp = 0.0F;
-#endif
-
-    //MCP9808
-#ifndef BALLONDUINO_NO_MCP
-    ENVData.mcp_temp = tempsensor.readTempC();    // degC
-#else
-            ENVData.mcp_temp = 0.0F;
-#endif
-}
-
-void Balloonduino::log_imu(File IMULogFile)
-{
-
-#ifndef BALLONDUINO_NO_BNO
-    // print the time to the file
-    print_time(IMULogFile);
-
-    // print the sensor values
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.system_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_y);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_z);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_y);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_z);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_y);
-    IMULogFile.print(", ");
-    IMULogFile.println(IMUData.mag_z);
-
-    IMULogFile.flush();
-#endif
-}
-
-void Balloonduino::log_env(File ENVLogFile)
-{
-    // print the time to the file
-    print_time(ENVLogFile);
-
-    // print the sensor values
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_pres);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_humid);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.ssc_pres);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.ssc_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bno_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.println(ENVData.mcp_temp);
-
-    ENVLogFile.flush();
-}
-
-void Balloonduino::log_pwr(File PWRLogFile)
-{
-
-#ifndef BALLONDUINO_NO_ADS
-    // print the time to the file
-    print_time(PWRLogFile);
-
-    // print the sensor values
-    PWRLogFile.print(", ");
-    PWRLogFile.print(PWRData.batt_volt);
-    PWRLogFile.print(", ");
-    PWRLogFile.println(PWRData.i_consump);
-
-    PWRLogFile.flush();
-#endif
-}
-
-uint16_t Balloonduino::create_HK_pkt()
-{
-    /*  create_HK_pkt()
-     *
-     *  Creates an HK packet containing the values of all the interface counters.
-     *  Packet data is filled into the memory passed in as the argument
-     *
-     */
-    // get the current time from the RTC
-    DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
-
-    // initalize counter to record length of packet
-    uint16_t payloadSize = 0;
-
-    // add length of primary header
-    payloadSize += sizeof(CCSDS_PriHdr_t);
-
-    // Populate primary header fields:
-    setAPID(OutPktBuf, HK_STAT_APID);
-    setSecHdrFlg(OutPktBuf, 1);
-    setPacketType(OutPktBuf, 0);
-    setVer(OutPktBuf, 0);
-    setSeqCtr(OutPktBuf, 0);
-    setSeqFlg(OutPktBuf, 0);
-
-    // add length of secondary header
-    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
-
-    // Populate the secondary header fields:
-    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
-    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
-
-    // Add counter values to the pkt
-    payloadSize = addIntToTlm(IntCtr.CmdExeCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.CmdRejCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.XbeeRcvdByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.XbeeSentByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(millis() / 1000L, OutPktBuf, payloadSize);    // Timer
-
-    // fill the length field
-    setPacketLength(OutPktBuf, payloadSize);
-
-    return payloadSize;
+    // do nothing
 }
 
 void Balloonduino::begin()
 {
-    /* setup()
-     *
+    /*
      * Disables watchdog timer (in case its on)
      * Initalizes all the link hardware/software including:
      *   Serial
@@ -414,6 +165,214 @@ void Balloonduino::begin()
 #endif
 }
 
+// populates the IMUData struct with data from the BNO IMU
+void Balloonduino::read_imu()
+{
+#ifndef BALLONDUINO_NO_BNO
+    uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
+    bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
+
+    // get measurements
+    imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);    // (values in uT, micro Teslas)
+    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);    // (values in rps, radians per second)
+    imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);    // (values in m/s^2)
+
+    // assign them into structure fields
+    IMUData.system_cal = system_cal;
+    IMUData.accel_cal = accel_cal;
+    IMUData.gyro_cal = gyro_cal;
+    IMUData.mag_cal = mag_cal;
+    IMUData.accel_x = accel.x();
+    IMUData.accel_y = accel.y();
+    IMUData.accel_z = accel.z();
+    IMUData.gyro_x = gyro.x();
+    IMUData.gyro_y = gyro.y();
+    IMUData.gyro_z = gyro.z();
+    IMUData.mag_x = mag.x();
+    IMUData.mag_y = mag.y();
+    IMUData.mag_z = mag.z();
+#endif
+}
+
+// populates the PWRData struct with data from the ADS
+void Balloonduino::read_pwr()
+{
+#ifndef BALLONDUINO_NO_ADS
+    PWRData.batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606;    // V
+    PWRData.i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5) * 10;
+#endif
+}
+
+// populates the ENVData struct with data from the BME
+void Balloonduino::read_env()
+{
+#ifndef BALLONDUINO_NO_BME
+    //BME280
+    ENVData.bme_pres = bme.readPressure() / 100.0F;    // hPa
+    ENVData.bme_temp = bme.readTemperature();       // degC
+    ENVData.bme_humid = bme.readHumidity();         // %
+#else
+            ENVData.bme_pres = 0.0F;    // hPa
+            ENVData.bme_temp = 0.0F;// degC
+            ENVData.bme_humid = 0.0F;// %
+#endif
+
+    //  SSC
+#ifndef BALLONDUINO_NO_SSC
+    ssc.update();
+    ENVData.ssc_pres = ssc.pressure();      // PSI
+    ENVData.ssc_temp = ssc.temperature();    // degC
+#else
+            ENVData.ssc_pres = 0.0F;    // PSI
+            ENVData.ssc_temp = 0.0F;// degC
+#endif
+
+    // BNO
+#ifndef BALLONDUINO_NO_BNO
+    ENVData.bno_temp = bno.getTemp();
+#else
+    ENVData.bno_temp = 0.0F;    // degC
+#endif
+
+    //MCP9808
+#ifndef BALLONDUINO_NO_MCP
+    ENVData.mcp_temp = tempsensor.readTempC();    // degC
+#else
+            ENVData.mcp_temp = 0.0F;
+#endif
+}
+
+void Balloonduino::log_imu(File IMULogFile)
+{
+#ifndef BALLONDUINO_NO_BNO
+    // print the time to the file
+    print_time(IMULogFile);
+
+    // print the sensor values
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.system_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_y);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_z);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_y);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_z);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_y);
+    IMULogFile.print(", ");
+    IMULogFile.println(IMUData.mag_z);
+
+    IMULogFile.flush();
+#endif
+}
+
+void Balloonduino::log_env(File ENVLogFile)
+{
+    // print the time to the file
+    print_time(ENVLogFile);
+
+    // print the sensor values
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_pres);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_humid);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.ssc_pres);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.ssc_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bno_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.println(ENVData.mcp_temp);
+
+    ENVLogFile.flush();
+}
+
+void Balloonduino::log_pwr(File PWRLogFile)
+{
+#ifndef BALLONDUINO_NO_ADS
+    // print the time to the file
+    print_time(PWRLogFile);
+
+    // print the sensor values
+    PWRLogFile.print(", ");
+    PWRLogFile.print(PWRData.batt_volt);
+    PWRLogFile.print(", ");
+    PWRLogFile.println(PWRData.i_consump);
+
+    PWRLogFile.flush();
+#endif
+}
+
+uint16_t Balloonduino::create_HK_pkt()
+{
+    /*  create_HK_pkt()
+     *
+     *  Creates an HK packet containing the values of all the interface counters.
+     *  Packet data is filled into the memory passed in as the argument
+     *
+     */
+
+    // get the current time from the RTC
+    DateTime now;
+#ifndef BALLONDUINO_NO_RTC
+    now = rtc.now();
+#else
+    uint32_t mils = millis();
+    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
+#endif
+
+    // initalize counter to record length of packet
+    uint16_t payloadSize = 0;
+
+    // add length of primary header
+    payloadSize += sizeof(CCSDS_PriHdr_t);
+
+    // Populate primary header fields:
+    setAPID(OutPktBuf, HK_STAT_APID);
+    setSecHdrFlg(OutPktBuf, 1);
+    setPacketType(OutPktBuf, 0);
+    setVer(OutPktBuf, 0);
+    setSeqCtr(OutPktBuf, 0);
+    setSeqFlg(OutPktBuf, 0);
+
+    // add length of secondary header
+    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
+
+    // Populate the secondary header fields:
+    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
+    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
+
+    // Add counter values to the pkt
+    payloadSize = addIntToTlm(IntCtr.CmdExeCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
+    payloadSize = addIntToTlm(IntCtr.CmdRejCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
+    payloadSize = addIntToTlm(IntCtr.XbeeRcvdByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
+    payloadSize = addIntToTlm(IntCtr.XbeeSentByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
+    payloadSize = addIntToTlm(millis() / 1000L, OutPktBuf, payloadSize);    // Timer
+
+    // fill the length field
+    setPacketLength(OutPktBuf, payloadSize);
+
+    return payloadSize;
+}
+
+
 uint16_t Balloonduino::create_ENV_pkt()
 {
     /*  create_ENV_pkt()
@@ -526,7 +485,6 @@ uint16_t Balloonduino::create_IMU_pkt()
 
     // get the current time from the RTC
     DateTime now;
-
 #ifndef BALLONDUINO_NO_RTC
     now = rtc.now();
 #else
@@ -581,7 +539,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
     /*  command_response()
      *
      *  given an array of data (presumably containing a CCSDS packet), check if the
-     *  packet is a CAMERA command packet, and if so, process it
+     *  packet is a command packet, and if so, process it
      */
 
     debug_serial.print("Rcvd: ");
@@ -759,22 +717,6 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
     }
 }
 
-void Balloonduino::print_time(File file)
-{
-    /*  print_time()
-     *
-     *  Prints the current time to the given log file
-     */
-
-    // get the current time from the RTC
-    DateTime now = rtc.now();
-
-    // print a datestamp to the file
-    char buf[50];
-    sprintf(buf, "%02d/%02d/%02d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
-    file.print(buf);
-}
-
 void Balloonduino::xbee_send_and_log(uint8_t dest_addr, uint8_t data[], uint8_t data_len, File file)
 {
     /*  xbee_send_and_log()
@@ -842,3 +784,25 @@ void Balloonduino::logPkt(File file, uint8_t data[], uint8_t len, uint8_t receiv
         file.flush();
     }
 }
+void Balloonduino::print_time(File file)
+{
+    /*  print_time()
+     *
+     *  Prints the current time to the given log file
+     */
+
+    // get the current time from the RTC
+    DateTime now;
+#ifndef BALLONDUINO_NO_RTC
+    now = rtc.now();
+#else
+    uint32_t mils = millis();
+    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
+#endif
+
+    // print a datestamp to the file
+    char buf[50];
+    sprintf(buf, "%02d/%02d/%02d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
+    file.print(buf);
+}
+
