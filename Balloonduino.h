@@ -49,10 +49,14 @@
 #endif
 
 #define CYCLE_DELAY 100 // time between execution cycles [ms]
-bool extended = false;
-bool armed = true;
 
 //// Enumerations
+/* Requests for HK packets to be sent to specified xbee addresses have the following format:
+ *   CCSDS Command Header (8 bytes)
+ *   Xbee address (1 byte)
+ */
+#define MAX_PKT_LEN 200
+
 // logging flag
 #define LOG_RCVD 1
 #define LOG_SEND 0
@@ -61,72 +65,46 @@ bool armed = true;
 #define INIT_RESPONSE 0xAC
 #define READ_FAIL_RESPONSE 0xAF
 #define BAD_COMMAND_RESPONSE 0xBB
-#define RETRACT_RESPONSE 0xE1
-#define EXTEND_RESPONSE 0xE2
 #define KEEPALIVE_RESPONSE 0xE4
-#define DISARM_RESPONSE 0xE5
-#define ARM_RESPONSE 0xE6
 
-// CAMERA FcnCodes
-#define COMMAND_NOOP 0
+// Built-in function codes
+#define COMMAND_NOOP 0  // No action other than to increment the interface counters
 #define REQUEST_PACKET_COUNTERS 10
 #define COMMAND_CLEAR_PACKET_COUNTERS 15
 #define REQUEST_ENVIRONMENTAL_DATA 20
 #define REQUEST_POWER_DATA 30
 #define REQUEST_IMU_DATA 40
-#define COMMAND_REBOOT 99
-
-#define PAN_ID 0x0B0B // XBee PAN address (must be the same for all xbees)
-// DO NOT CHANGE without changing for all xbees
-#define LINK_XBEE_ADDRESS 0x0002
-// DO NOT CHANGE without confirming with ground system definitions
-
-//// Declare objects
-Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x29);
-Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
-RTC_DS1307 rtc;
-RTC_Millis SoftRTC;    // This is the millis()-based software RTC
-Adafruit_BME280 bme;
-Adafruit_ADS1015 ads(0x4A);
-SSC ssc(0x28, 255);
+#define COMMAND_REBOOT 99   // Requests reboot
 
 //// Serial object aliases
 // so that the user doesn't have to keep track of which is which
 #define debug_serial Serial
 #define xbee_serial Serial
-#define MAX_PKT_LEN 200
-
-// Built-in function codes
-#define NOOP_FCNCODE 0
-#define HKREQ_FCNCODE 10
-#define RESETCTR_FCNCODE 15
-#define REQENV_FCNCODE 20
-#define REQPWR_FCNCODE 30
-#define REQIMU_FCNCODE 40
-#define REBOOT_FCNCODE 99
 
 //// Xbee setup parameters
-// DO NOT CHANGE without making corresponding change in ground system definitions
-#define XBEE_ADDR 0x0006 // XBee address for this payload
-// DO NOT CHANGE without changing for all xbees
-#define XBEE_ID 0x0B0B // XBee PAN address (must be the same for all xbees)
+#ifndef XBEE_ADDR   // XBee address for this payload
+#define XBEE_ADDR 0x0006    // DO NOT CHANGE without making corresponding change in ground system definitions
+#endif
+#ifndef XBEE_PAN_ID // XBee PAN address (must be the same for all xbees)
+#define XBEE_PAN_ID 0x0B0B  // DO NOT CHANGE without changing for all xbees
+#endif
+#ifndef LINK_XBEE_ADDRESS   //  XBee address of Link (connection to ground station housed in Command)
+#define LINK_XBEE_ADDRESS 0x0002    // DO NOT CHANGE without confirming with ground system definitions
+#endif
 
+// APIDs
 #ifndef CMD_APID
 #define CMD_APID 100
 #endif
-
 #ifndef HK_STAT_APID
 #define HK_STAT_APID 110
 #endif
-
 #ifndef IMU_STAT_APID
 #define IMU_STAT_APID 120
 #endif
-
 #ifndef ENV_STAT_APID
 #define ENV_STAT_APID 130
 #endif
-
 #ifndef PWR_STAT_APID
 #define PWR_STAT_APID 140
 #endif

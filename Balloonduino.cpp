@@ -11,11 +11,11 @@ Balloonduino::Balloonduino()
     // do nothing
 }
 
-void Balloonduino::begin()
+int Balloonduino::begin()
 {
     /*
      * Disables watchdog timer (in case its on)
-     * Initalizes all the link hardware/software including:
+     * Initalizes all the board hardware/software including:
      *   Serial
      *   Xbee
      *   RTC
@@ -42,11 +42,14 @@ void Balloonduino::begin()
     debug_serial.begin(250000);
     xbee_serial.begin(9600);
 
+    bool initialized = true;
+
+    //// Init BNO IMU
 #ifndef BALLONDUINO_NO_BNO
-    //// BNO
     if (!bno.begin())
     {
         debug_serial.println("WARNING: BNO055 initialization failure.");
+        initialized = false;
     }
     else
     {
@@ -56,11 +59,12 @@ void Balloonduino::begin()
     bno.setExtCrystalUse(true);
 #endif
 
+    //// Init MCP9808 temperature sensor
 #ifndef BALLONDUINO_NO_MCP
-    //// MCP9808
     if (!tempsensor.begin(0x18))
     {
         debug_serial.println("WARNING: MCP9808 initialization failure.");
+        initialized = false;
     }
     else
     {
@@ -68,7 +72,7 @@ void Balloonduino::begin()
     }
 #endif
 
-    //// RTC
+    //// Init DS1308 RTC
     /* The RTC is used so that the log files contain timestamps. If the RTC
      *  is not running (because no battery is inserted) the RTC will be initalized
      *  to the time that this sketch was compiled at.
@@ -77,6 +81,7 @@ void Balloonduino::begin()
     if (!rtc.begin())
     {
         debug_serial.println("WARNING: DS1308 RTC initialization failure.");
+        initialized = false;
     }
     else
     {
@@ -98,11 +103,12 @@ void Balloonduino::begin()
     start_millis = millis();    // get the current millisecond count
 #endif
 
-    //// Init BME
+    //// Init BME environmental sensor
 #ifndef BALLONDUINO_NO_BME
     if (!bme.begin(0x76))
     {
         debug_serial.println("WARNING: BME280 initialization failure.");
+        initialized = false;
     }
     else
     {
@@ -110,40 +116,14 @@ void Balloonduino::begin()
     }
 #endif
 
-    //// Init ADS
+    //// Init ADS power monitor
 #ifndef BALLONDUINO_NO_ADS
     ads.begin();
     ads.setGain(GAIN_ONE);
     debug_serial.println("ADS1015 initialized.");
 #endif
 
-    //// Init SD card
-    SPI.begin();
-    pinMode(53, OUTPUT);
-    if (!SD.begin(53))
-    {
-        debug_serial.println("SD Card initialization failure.");
-    }
-    else
-    {
-        debug_serial.println("SD Card initialized.");
-    }
-
-    // xbee
-    debug_serial.println("Beginning xbee init");
-
-    int xbeeStatus = InitXBee(XBEE_ADDR, PAN_ID, xbee_serial, false);
-    if (!xbeeStatus)
-    {
-        debug_serial.println("XBee initialized.");
-    }
-    else
-    {
-        debug_serial.print("ERROR: XBee initialization error with code: ");
-        debug_serial.println(xbeeStatus);
-    }
-
-    //// Init SSC
+    //// Init SSC pressure sensor
     //  set min / max reading and pressure, see datasheet for the values for your
     //  sensor
 #ifndef BALLONDUINO_NO_SSC
@@ -155,6 +135,35 @@ void Balloonduino::begin()
     //  start the sensor
     debug_serial.print("SSC start: ");
     debug_serial.println(ssc.start());
+#endif
+
+    //// Init XBee radio
+    debug_serial.println("Beginning xbee init");
+
+    int xbeeStatus = InitXBee(XBEE_ADDR, XBEE_PAN_ID, xbee_serial, false);
+    if (!xbeeStatus)
+    {
+        debug_serial.println("XBee initialized.");
+    }
+    else
+    {
+        debug_serial.print("ERROR: XBee initialization error with code: ");
+        debug_serial.println(xbeeStatus);
+        initialized = false;
+    }
+
+    //// Init MicroSD storage
+    SPI.begin();
+    pinMode(53, OUTPUT);
+    if (!SD.begin(53))
+    {
+        debug_serial.println("SD Card initialization failure.");
+        initialized = false;
+    }
+    else
+    {
+        debug_serial.println("SD Card initialized.");
+    }
 
     // MicroSD
     // appends to current file
@@ -162,7 +171,8 @@ void Balloonduino::begin()
     File IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
     File PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
     File ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
-#endif
+
+    return initialized;
 }
 
 // populates the IMUData struct with data from the BNO IMU
@@ -372,7 +382,6 @@ uint16_t Balloonduino::create_HK_pkt()
     return payloadSize;
 }
 
-
 uint16_t Balloonduino::create_ENV_pkt()
 {
     /*  create_ENV_pkt()
@@ -565,7 +574,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
         switch (FcnCode)
         {
             // NoOp Cmd
-            case NOOP_FCNCODE:
+            case COMMAND_NOOP:
                 // No action other than to increment the interface counters
 
                 debug_serial.println("Received NoOp Cmd");
@@ -575,7 +584,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // HK_Req
-            case HKREQ_FCNCODE:
+            case REQUEST_PACKET_COUNTERS:
                 // Requests that an HK packet be sent to the specified xbee address
                 /*  Command format:
                  *   CCSDS Command Header (8 bytes)
@@ -598,7 +607,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // ResetCtr
-            case RESETCTR_FCNCODE:
+            case COMMAND_CLEAR_PACKET_COUNTERS:
                 // Requests that an HK packet be sent to the specified xbee address
                 /*  Command format:
                  *   CCSDS Command Header (8 bytes)
@@ -617,7 +626,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // ENV_Req
-            case REQENV_FCNCODE:
+            case REQUEST_ENVIRONMENTAL_DATA:
                 // Requests that an HK packet be sent to the specified xbee address
                 /*  Command format:
                  *   CCSDS Command Header (8 bytes)
@@ -640,7 +649,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // PWR_Req
-            case REQPWR_FCNCODE:
+            case REQUEST_POWER_DATA:
                 // Requests that an HK packet be sent to the specified xbee address
                 /*  Command format:
                  *   CCSDS Command Header (8 bytes)
@@ -663,7 +672,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // IMU_Req
-            case REQIMU_FCNCODE:
+            case REQUEST_IMU_DATA:
                 // Requests that an HK packet be sent to the specified xbee address
                 /*  Command format:
                  *   CCSDS Command Header (8 bytes)
@@ -686,7 +695,7 @@ void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
                 break;
 
                 // Reboot
-            case REBOOT_FCNCODE:
+            case COMMAND_REBOOT:
                 // Requests that Link reboot
 
                 debug_serial.println("Received Reboot Cmd");
