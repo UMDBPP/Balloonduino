@@ -3,8 +3,8 @@
  * balloonduino: modified Arduino Mega
  */
 
-#ifndef Balloonduino_lib_h
-#define Balloonduino_lib_h
+#ifndef Balloonduino_h
+#define Balloonduino_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
@@ -17,9 +17,9 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
-#include "CCSDS_Xbee/CCSDS.h"
-#include "CCSDS_Xbee/ccsds_xbee.h"
-#include "CCSDS_Xbee/ccsds_util.h"
+#include <CCSDS.h>
+#include <ccsds_xbee.h>
+#include <ccsds_util.h>
 #include <SD.h>
 
 // Optional hardware
@@ -48,11 +48,55 @@
 #include <SSC.h>
 #endif
 
+#define CYCLE_DELAY 100 // time between execution cycles [ms]
+bool extended = false;
+bool armed = true;
+
+//// Enumerations
+// logging flag
+#define LOG_RCVD 1
+#define LOG_SEND 0
+
+/* response codes */
+#define INIT_RESPONSE 0xAC
+#define READ_FAIL_RESPONSE 0xAF
+#define BAD_COMMAND_RESPONSE 0xBB
+#define RETRACT_RESPONSE 0xE1
+#define EXTEND_RESPONSE 0xE2
+#define KEEPALIVE_RESPONSE 0xE4
+#define DISARM_RESPONSE 0xE5
+#define ARM_RESPONSE 0xE6
+
+// CAMERA FcnCodes
+#define COMMAND_NOOP 0
+#define REQUEST_PACKET_COUNTERS 10
+#define COMMAND_CLEAR_PACKET_COUNTERS 15
+#define REQUEST_ENVIRONMENTAL_DATA 20
+#define REQUEST_POWER_DATA 30
+#define REQUEST_IMU_DATA 40
+#define COMMAND_REBOOT 99
+
+#define PAN_ID 0x0B0B // XBee PAN address (must be the same for all xbees)
+// DO NOT CHANGE without changing for all xbees
+#define LINK_XBEE_ADDRESS 0x0002
+// DO NOT CHANGE without confirming with ground system definitions
+
+//// Declare objects
+Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x29);
+Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
+RTC_DS1307 rtc;
+RTC_Millis SoftRTC;    // This is the millis()-based software RTC
+Adafruit_BME280 bme;
+Adafruit_ADS1015 ads(0x4A);
+SSC ssc(0x28, 255);
+
+//// Serial object aliases
+// so that the user doesn't have to keep track of which is which
 #define debug_serial Serial
-#define xbee_serial Serial3
+#define xbee_serial Serial
 #define MAX_PKT_LEN 200
 
-// Built-in functioncodes
+// Built-in function codes
 #define NOOP_FCNCODE 0
 #define HKREQ_FCNCODE 10
 #define RESETCTR_FCNCODE 15
@@ -62,70 +106,80 @@
 #define REBOOT_FCNCODE 99
 
 //// Xbee setup parameters
-#define XBEE_ADDR 0x0006 // XBee address for this payload 
 // DO NOT CHANGE without making corresponding change in ground system definitions
-#define XBEE_ID 0x0B0B // XBee PAN address (must be the same for all xbees)
+#define XBEE_ADDR 0x0006 // XBee address for this payload
 // DO NOT CHANGE without changing for all xbees
+#define XBEE_ID 0x0B0B // XBee PAN address (must be the same for all xbees)
 
 #ifndef CMD_APID
 #define CMD_APID 100
 #endif
+
 #ifndef HK_STAT_APID
 #define HK_STAT_APID 110
 #endif
+
 #ifndef IMU_STAT_APID
 #define IMU_STAT_APID 120
 #endif
+
 #ifndef ENV_STAT_APID
 #define ENV_STAT_APID 130
 #endif
+
 #ifndef PWR_STAT_APID
 #define PWR_STAT_APID 140
 #endif
 
-
 //// Data Structures
 // imu data
 #ifndef BALLONDUINO_NO_BNO
-struct IMUData_s {
-   uint8_t system_cal;
-   uint8_t accel_cal;
-   uint8_t gyro_cal;
-   uint8_t mag_cal;
-   float accel_x;
-   float accel_y;
-   float accel_z;
-   float gyro_x;
-   float gyro_y;
-   float gyro_z;
-   float mag_x;
-   float mag_y;
-   float mag_z;
-}; 
+struct IMUData_s
+{
+        uint8_t system_cal;
+        uint8_t accel_cal;
+        uint8_t gyro_cal;
+        uint8_t mag_cal;
+        float accel_x;
+        float accel_y;
+        float accel_z;
+        float gyro_x;
+        float gyro_y;
+        float gyro_z;
+        float mag_x;
+        float mag_y;
+        float mag_z;
+};
 #endif
+
 // environmental data
-struct ENVData_s {
-  float bme_pres;
-  float bme_temp;
-  float bme_humid;
-  float ssc_pres;
-  float ssc_temp;
-  float bno_temp;
-  float mcp_temp;
-}; 
+struct ENVData_s
+{
+        float bme_pres;
+        float bme_temp;
+        float bme_humid;
+        float ssc_pres;
+        float ssc_temp;
+        float bno_temp;
+        float mcp_temp;
+};
+
 // power data
 #ifndef BALLONDUINO_NO_ADS
-struct PWRData_s {
-  float batt_volt;
-  float i_consump;
-}; 
+struct PWRData_s
+{
+        float batt_volt;
+        float i_consump;
+};
 #endif
-struct IntCtr_s {
-  uint16_t CmdExeCtr;
-  uint16_t CmdRejCtr;
-  uint16_t XbeeRcvdByteCtr;
-  uint16_t XbeeSentByteCtr;
-}; 
+
+struct IntCtr_s
+{
+        uint16_t CmdExeCtr;
+        uint16_t CmdRejCtr;
+        uint16_t XbeeRcvdByteCtr;
+        uint16_t XbeeSentByteCtr;
+};
 
 class Balloonduino
 {
@@ -140,8 +194,8 @@ class Balloonduino
         void printFormattedTime();
 
         void begin();
-        
-        void command_response(uint8_t data[], uint8_t data_len, File file); 
+
+        void command_response(uint8_t data[], uint8_t data_len, File file);
         // pkt creation
         uint16_t create_HK_pkt();
         uint16_t create_IMU_pkt();
@@ -163,38 +217,41 @@ class Balloonduino
     private:
         uint32_t milliseconds, delayMilliseconds;
         byte hours, minutes, seconds, launchTolerance;
-        double altitude, temperature, pressure;
-        bool isLaunched;
+        double altitude, temperature, pressure;bool isLaunched;
+
         IntCtr_s IntCtr;
         uint8_t OutPktBuf[MAX_PKT_LEN];
         uint8_t InPktBuf[MAX_PKT_LEN];
         ENVData_s ENVData;
+
         //// Declare objects
-        #ifndef BALLONDUINO_NO_BNO
+#ifndef BALLONDUINO_NO_BNO
         Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x29);
         IMUData_s IMUData;
-        #endif
-        #ifndef BALLONDUINO_NO_MCP
+#endif
+
+#ifndef BALLONDUINO_NO_MCP
         Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
-        #endif
-        #ifndef BALLONDUINO_NO_RTC
+#endif
+
+#ifndef BALLONDUINO_NO_RTC
         RTC_DS1307 rtc = RTC_DS1307();
-        RTC_Millis softrtc;   // This is the millis()-based software RTC
+        RTC_Millis softrtc;    // This is the millis()-based software RTC
         uint32_t start_millis = 0;
-        #endif
-        #ifndef BALLONDUINO_NO_BME
+#endif
+
+#ifndef BALLONDUINO_NO_BME
         Adafruit_BME280 bme = Adafruit_BME280();
-        #endif
-        #ifndef BALLONDUINO_NO_ADS
+#endif
+
+#ifndef BALLONDUINO_NO_ADS
         Adafruit_ADS1015 ads = Adafruit_ADS1015(0x4A);
         PWRData_s PWRData;
-        #endif
-        #ifndef BALLONDUINO_NO_SSC
-        SSC ssc = SSC(0x28, 255); 
-        #endif
-        
+#endif
+
+#ifndef BALLONDUINO_NO_SSC
+        SSC ssc = SSC(0x28, 255);
+#endif
 };
-
-
 
 #endif
