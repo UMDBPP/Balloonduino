@@ -11,7 +11,15 @@ Balloonduino::Balloonduino()
     // do nothing
 }
 
-int Balloonduino::begin()
+bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B, int cmd_apid = 100, hk_stat_apid = 110, imu_stat_apid = 120, env_stat_apid =
+        130, pwr_stat_apid = 140,
+bool use_xbee = true,
+bool use_bno = true,
+bool use_mcp = true,
+bool use_rtc = true,
+bool use_bme = true,
+bool use_ads = true,
+bool use_ssc = true)
 {
     /*
      * Disables watchdog timer (in case its on)
@@ -28,6 +36,15 @@ int Balloonduino::begin()
      *   SD card
      *   Log files
      */
+
+    xbee_enable = use_xbee;
+    bno_enable = use_bno;
+    mcp_enable = use_mcp;
+    rtc_enable = use_rtc;
+    bme_enable = use_bme;
+    ads_enable = use_ads;
+    ssc_enable = use_ssc;
+
     // disable the watchdog timer immediately in case it was on because of a
     // commanded reboot
     wdt_disable();
@@ -44,112 +61,121 @@ int Balloonduino::begin()
 
     bool initialized = true;
 
+    //// Init XBee radio
+    if (xbee_enable)
+    {
+        debug_serial.println("Beginning xbee init");
+
+        int xbeeStatus = InitXBee(xbee_address, xbee_pan_id, xbee_serial, false);
+        if (!xbeeStatus)
+        {
+            debug_serial.println("XBee initialized.");
+        }
+        else
+        {
+            debug_serial.print("ERROR: XBee initialization error with code: ");
+            debug_serial.println(xbeeStatus);
+            initialized = false;
+        }
+    }
+
     //// Init BNO IMU
-#ifndef BALLONDUINO_NO_BNO
-    if (!bno.begin())
+    if (bno_enable)
     {
-        debug_serial.println("WARNING: BNO055 initialization failure.");
-        initialized = false;
+        if (!bno.begin())
+        {
+            debug_serial.println("WARNING: BNO055 initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("BNO055 initialized.");
+        }
+        delay(1000);
+        bno.setExtCrystalUse(true);
     }
-    else
-    {
-        debug_serial.println("BNO055 initialized.");
-    }
-    delay(1000);
-    bno.setExtCrystalUse(true);
-#endif
 
     //// Init MCP9808 temperature sensor
-#ifndef BALLONDUINO_NO_MCP
-    if (!tempsensor.begin(0x18))
+    if (mcp_enable)
     {
-        debug_serial.println("WARNING: MCP9808 initialization failure.");
-        initialized = false;
+        if (!tempsensor.begin(0x18))
+        {
+            debug_serial.println("WARNING: MCP9808 initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("MCP9808 initialized.");
+        }
     }
-    else
-    {
-        debug_serial.println("MCP9808 initialized.");
-    }
-#endif
 
     //// Init DS1308 RTC
     /* The RTC is used so that the log files contain timestamps. If the RTC
      *  is not running (because no battery is inserted) the RTC will be initalized
      *  to the time that this sketch was compiled at.
      */
-#ifndef BALLONDUINO_NO_RTC
-    if (!rtc.begin())
+    if (rtc_enable)
     {
-        debug_serial.println("WARNING: DS1308 RTC initialization failure.");
-        initialized = false;
-    }
-    else
-    {
-        debug_serial.println("DS1308 RTC initialized.");
-    }
+        if (!rtc.begin())
+        {
+            debug_serial.println("WARNING: DS1308 RTC initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("DS1308 RTC initialized.");
+        }
 
-    if (!rtc.isrunning())
-    {
-        debug_serial.println("WARNING: RTC is NOT running!");
-        // following line sets the RTC to the date & time this sketch was compiled
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-        // This line sets the RTC with an explicit date & time, for example to set
-        // January 21, 2014 at 3am you would call:
-        // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-    }
+        if (!rtc.isrunning())
+        {
+            debug_serial.println("WARNING: RTC is NOT running!");
+            // following line sets the RTC to the date & time this sketch was compiled
+            rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+            // This line sets the RTC with an explicit date & time, for example to set
+            // January 21, 2014 at 3am you would call:
+            // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+        }
 
-    //// SoftRTC (for subsecond precision)
-    SoftRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
-    start_millis = millis();    // get the current millisecond count
-#endif
+        //// SoftRTC (for subsecond precision)
+        SoftRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
+        start_millis = millis();    // get the current millisecond count
+    }
 
     //// Init BME environmental sensor
-#ifndef BALLONDUINO_NO_BME
-    if (!bme.begin(0x76))
+    if (bme_enable)
     {
-        debug_serial.println("WARNING: BME280 initialization failure.");
-        initialized = false;
+        if (!bme.begin(0x76))
+        {
+            debug_serial.println("WARNING: BME280 initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("BME280 initialized.");
+        }
     }
-    else
-    {
-        debug_serial.println("BME280 initialized.");
-    }
-#endif
 
     //// Init ADS power monitor
-#ifndef BALLONDUINO_NO_ADS
-    ads.begin();
-    ads.setGain(GAIN_ONE);
-    debug_serial.println("ADS1015 initialized.");
-#endif
+    if (use_ads)
+    {
+        ads.begin();
+        ads.setGain(GAIN_ONE);
+        debug_serial.println("ADS1015 initialized.");
+    }
 
     //// Init SSC pressure sensor
     //  set min / max reading and pressure, see datasheet for the values for your
     //  sensor
-#ifndef BALLONDUINO_NO_SSC
-    ssc.setMinRaw(0);
-    ssc.setMaxRaw(16383);
-    ssc.setMinPressure(0.0);
-    ssc.setMaxPressure(30);
-
-    //  start the sensor
-    debug_serial.print("SSC start: ");
-    debug_serial.println(ssc.start());
-#endif
-
-    //// Init XBee radio
-    debug_serial.println("Beginning xbee init");
-
-    int xbeeStatus = InitXBee(XBEE_ADDR, XBEE_PAN_ID, xbee_serial, false);
-    if (!xbeeStatus)
+    if (ssc_enable)
     {
-        debug_serial.println("XBee initialized.");
-    }
-    else
-    {
-        debug_serial.print("ERROR: XBee initialization error with code: ");
-        debug_serial.println(xbeeStatus);
-        initialized = false;
+        ssc.setMinRaw(0);
+        ssc.setMaxRaw(16383);
+        ssc.setMinPressure(0.0);
+        ssc.setMaxPressure(30);
+
+        //  start the sensor
+        debug_serial.print("SSC start: ");
+        debug_serial.println(ssc.start());
     }
 
     //// Init MicroSD storage
@@ -168,8 +194,16 @@ int Balloonduino::begin()
     // MicroSD
     // appends to current file
     // NOTE: Filenames must be shorter than 8 characters
-    File IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
-    File PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
+    if (bno_enable)
+    {
+        File IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
+    }
+
+    if (use_ads)
+    {
+        File PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
+    }
+
     File ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
 
     return initialized;
@@ -178,156 +212,190 @@ int Balloonduino::begin()
 // populates the IMUData struct with data from the BNO IMU
 void Balloonduino::read_imu()
 {
-#ifndef BALLONDUINO_NO_BNO
-    uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
-    bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
+    if (bno_enable)
+    {
+        uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
+        bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
 
-    // get measurements
-    imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);    // (values in uT, micro Teslas)
-    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);    // (values in rps, radians per second)
-    imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);    // (values in m/s^2)
+        // get measurements
+        imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);    // (values in uT, micro Teslas)
+        imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);    // (values in rps, radians per second)
+        imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);    // (values in m/s^2)
 
-    // assign them into structure fields
-    IMUData.system_cal = system_cal;
-    IMUData.accel_cal = accel_cal;
-    IMUData.gyro_cal = gyro_cal;
-    IMUData.mag_cal = mag_cal;
-    IMUData.accel_x = accel.x();
-    IMUData.accel_y = accel.y();
-    IMUData.accel_z = accel.z();
-    IMUData.gyro_x = gyro.x();
-    IMUData.gyro_y = gyro.y();
-    IMUData.gyro_z = gyro.z();
-    IMUData.mag_x = mag.x();
-    IMUData.mag_y = mag.y();
-    IMUData.mag_z = mag.z();
-#endif
+        // assign them into structure fields
+        IMUData.system_cal = system_cal;
+        IMUData.accel_cal = accel_cal;
+        IMUData.gyro_cal = gyro_cal;
+        IMUData.mag_cal = mag_cal;
+        IMUData.accel_x = accel.x();
+        IMUData.accel_y = accel.y();
+        IMUData.accel_z = accel.z();
+        IMUData.gyro_x = gyro.x();
+        IMUData.gyro_y = gyro.y();
+        IMUData.gyro_z = gyro.z();
+        IMUData.mag_x = mag.x();
+        IMUData.mag_y = mag.y();
+        IMUData.mag_z = mag.z();
+    }
 }
 
 // populates the PWRData struct with data from the ADS
 void Balloonduino::read_pwr()
 {
-#ifndef BALLONDUINO_NO_ADS
-    PWRData.batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606;    // V
-    PWRData.i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5) * 10;
-#endif
+    if (ads_enable)
+    {
+        PWRData.batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606;    // V
+        PWRData.i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5) * 10;
+    }
 }
 
 // populates the ENVData struct with data from the BME
 void Balloonduino::read_env()
 {
-#ifndef BALLONDUINO_NO_BME
-    //BME280
-    ENVData.bme_pres = bme.readPressure() / 100.0F;    // hPa
-    ENVData.bme_temp = bme.readTemperature();       // degC
-    ENVData.bme_humid = bme.readHumidity();         // %
-#else
-            ENVData.bme_pres = 0.0F;    // hPa
-            ENVData.bme_temp = 0.0F;// degC
-            ENVData.bme_humid = 0.0F;// %
-#endif
+    if (bme_enable)
+    {
+        //BME280
+        ENVData.bme_pres = bme.readPressure() / 100.0F;    // hPa
+        ENVData.bme_temp = bme.readTemperature();       // degC
+        ENVData.bme_humid = bme.readHumidity();         // %
+    }
+    else
+    {
+        ENVData.bme_pres = 0.0F;    // hPa
+        ENVData.bme_temp = 0.0F;    // degC
+        ENVData.bme_humid = 0.0F;    // %
+    }
 
     //  SSC
-#ifndef BALLONDUINO_NO_SSC
-    ssc.update();
-    ENVData.ssc_pres = ssc.pressure();      // PSI
-    ENVData.ssc_temp = ssc.temperature();    // degC
-#else
-            ENVData.ssc_pres = 0.0F;    // PSI
-            ENVData.ssc_temp = 0.0F;// degC
-#endif
+    if (ssc_enable)
+    {
+        ssc.update();
+        ENVData.ssc_pres = ssc.pressure();      // PSI
+        ENVData.ssc_temp = ssc.temperature();      // degC
+    }
+    else
+    {
+        ENVData.ssc_pres = 0.0F;    // PSI
+        ENVData.ssc_temp = 0.0F;    // degC
+    }
 
     // BNO
-#ifndef BALLONDUINO_NO_BNO
-    ENVData.bno_temp = bno.getTemp();
-#else
-    ENVData.bno_temp = 0.0F;    // degC
-#endif
+    if (bno_enable)
+    {
+        ENVData.bno_temp = bno.getTemp();
+    }
+    else
+    {
+        ENVData.bno_temp = 0.0F;    // degC
+    }
 
     //MCP9808
-#ifndef BALLONDUINO_NO_MCP
-    ENVData.mcp_temp = tempsensor.readTempC();    // degC
-#else
-            ENVData.mcp_temp = 0.0F;
-#endif
+    if (mcp_enable)
+    {
+        ENVData.mcp_temp = tempsensor.readTempC();    // degC
+    }
+    else
+    {
+        ENVData.mcp_temp = 0.0F;
+    }
 }
 
 void Balloonduino::log_imu(File IMULogFile)
 {
-#ifndef BALLONDUINO_NO_BNO
-    // print the time to the file
-    print_time(IMULogFile);
+    if (bno_enable)
+    {
+        // print the time to the file
+        print_time(IMULogFile);
 
-    // print the sensor values
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.system_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_cal);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_y);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.accel_z);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_y);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.gyro_z);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_x);
-    IMULogFile.print(", ");
-    IMULogFile.print(IMUData.mag_y);
-    IMULogFile.print(", ");
-    IMULogFile.println(IMUData.mag_z);
+        // print the sensor values
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.system_cal);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.accel_cal);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.gyro_cal);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.mag_cal);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.accel_x);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.accel_y);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.accel_z);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.gyro_x);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.gyro_y);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.gyro_z);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.mag_x);
+        IMULogFile.print(", ");
+        IMULogFile.print(IMUData.mag_y);
+        IMULogFile.print(", ");
+        IMULogFile.println(IMUData.mag_z);
 
-    IMULogFile.flush();
-#endif
+        IMULogFile.flush();
+    }
 }
 
 void Balloonduino::log_env(File ENVLogFile)
 {
-    // print the time to the file
-    print_time(ENVLogFile);
+    if (bme_enable || ssc_enable || bno_enable || mcp_enable)
+    {
+        // print the time to the file
+        print_time(ENVLogFile);
 
-    // print the sensor values
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_pres);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bme_humid);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.ssc_pres);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.ssc_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.print(ENVData.bno_temp);
-    ENVLogFile.print(", ");
-    ENVLogFile.println(ENVData.mcp_temp);
+        // print the sensor values
+        if (bme_enable)
+        {
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.bme_pres);
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.bme_temp);
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.bme_humid);
+        }
 
-    ENVLogFile.flush();
+        if (ssc_enable)
+        {
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.ssc_pres);
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.ssc_temp);
+        }
+
+        if (bno_enable)
+        {
+            ENVLogFile.print(", ");
+            ENVLogFile.print(ENVData.bno_temp);
+        }
+
+        if (mcp_enable)
+        {
+            ENVLogFile.print(", ");
+            ENVLogFile.println(ENVData.mcp_temp);
+        }
+
+        ENVLogFile.flush();
+    }
 }
 
 void Balloonduino::log_pwr(File PWRLogFile)
 {
-#ifndef BALLONDUINO_NO_ADS
-    // print the time to the file
-    print_time(PWRLogFile);
+    if (ads_enable)
+    {
+        // print the time to the file
+        print_time(PWRLogFile);
 
-    // print the sensor values
-    PWRLogFile.print(", ");
-    PWRLogFile.print(PWRData.batt_volt);
-    PWRLogFile.print(", ");
-    PWRLogFile.println(PWRData.i_consump);
+        // print the sensor values
+        PWRLogFile.print(", ");
+        PWRLogFile.print(PWRData.batt_volt);
+        PWRLogFile.print(", ");
+        PWRLogFile.println(PWRData.i_consump);
 
-    PWRLogFile.flush();
-#endif
+        PWRLogFile.flush();
+    }
 }
 
 uint16_t Balloonduino::create_HK_pkt()
@@ -339,22 +407,25 @@ uint16_t Balloonduino::create_HK_pkt()
      *
      */
 
-    // get the current time from the RTC
+// get the current time from the RTC
     DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
+    if (rtc_enable)
+    {
+        now = rtc.now();
+    }
+    else
+    {
+        uint32_t mils = millis();
+        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U)
+    }
 
-    // initalize counter to record length of packet
+// initalize counter to record length of packet
     uint16_t payloadSize = 0;
 
-    // add length of primary header
+// add length of primary header
     payloadSize += sizeof(CCSDS_PriHdr_t);
 
-    // Populate primary header fields:
+// Populate primary header fields:
     setAPID(OutPktBuf, HK_STAT_APID);
     setSecHdrFlg(OutPktBuf, 1);
     setPacketType(OutPktBuf, 0);
@@ -362,7 +433,7 @@ uint16_t Balloonduino::create_HK_pkt()
     setSeqCtr(OutPktBuf, 0);
     setSeqFlg(OutPktBuf, 0);
 
-    // add length of secondary header
+// add length of secondary header
     payloadSize += sizeof(CCSDS_TlmSecHdr_t);
 
     // Populate the secondary header fields:
@@ -390,14 +461,18 @@ uint16_t Balloonduino::create_ENV_pkt()
      *  Packet data is filled into the memory passed in as the argument
      *
      */
+
     // get the current time from the RTC
     DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
+    if (rtc_enable)
+    {
+        now = rtc.now();
+    }
+    else
+    {
+        uint32_t mils = millis();
+        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
+    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
@@ -443,14 +518,18 @@ uint16_t Balloonduino::create_PWR_pkt()
      *  Packet data is filled into the memory passed in as the argument
      *
      */
+
     // get the current time from the RTC
     DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
+    if (rtc_enable)
+    {
+        now = rtc.now();
+    }
+    else
+    {
+        uint32_t mils = millis();
+        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
+    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
@@ -494,12 +573,15 @@ uint16_t Balloonduino::create_IMU_pkt()
 
     // get the current time from the RTC
     DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
+    if (rtc_enable)
+    {
+        now = rtc.now();
+    }
+    else
+    {
+        uint32_t mils = millis();
+        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
+    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
@@ -793,6 +875,7 @@ void Balloonduino::logPkt(File file, uint8_t data[], uint8_t len, uint8_t receiv
         file.flush();
     }
 }
+
 void Balloonduino::print_time(File file)
 {
     /*  print_time()
@@ -802,12 +885,15 @@ void Balloonduino::print_time(File file)
 
     // get the current time from the RTC
     DateTime now;
-#ifndef BALLONDUINO_NO_RTC
-    now = rtc.now();
-#else
-    uint32_t mils = millis();
-    now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U )
-#endif
+    if (rtc_enable)
+    {
+        now = rtc.now();
+    }
+    else
+    {
+        uint32_t mils = millis();
+        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
+    }
 
     // print a datestamp to the file
     char buf[50];

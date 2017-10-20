@@ -12,6 +12,8 @@
 #include "WProgram.h"
 #endif
 
+#include <stdio.h>
+
 // Non optional
 #include <avr/wdt.h> // watchdog timer
 #include <Wire.h>
@@ -22,31 +24,27 @@
 #include <ccsds_util.h>
 #include <SD.h>
 
+bool xbee_enable = true;
+bool bno_enable = true;
+bool mcp_enable = true;
+bool rtc_enable = true;
+bool bme_enable = true;
+bool ads_enable = true;
+bool ssc_enable = true;
+
 // Optional hardware
-#ifndef BALLONDUINO_NO_BNO
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
-#endif
 
-#ifndef BALLONDUINO_NO_MCP
 #include "Adafruit_MCP9808.h"
-#endif
 
-#ifndef BALLONDUINO_NO_RTC
 #include "RTClib.h" // RTC and SoftRTC
-#endif
 
-#ifndef BALLONDUINO_NO_BME
 #include <Adafruit_BME280.h>
-#endif
 
-#ifndef BALLONDUINO_NO_ADS
 #include <Adafruit_ADS1015.h>
-#endif
 
-#ifndef BALLONDUINO_NO_SSC
 #include <SSC.h>
-#endif
 
 #define CYCLE_DELAY 100 // time between execution cycles [ms]
 
@@ -81,37 +79,9 @@
 #define debug_serial Serial
 #define xbee_serial Serial
 
-//// Xbee setup parameters
-#ifndef XBEE_ADDR   // XBee address for this payload
-#define XBEE_ADDR 0x0006    // DO NOT CHANGE without making corresponding change in ground system definitions
-#endif
-#ifndef XBEE_PAN_ID // XBee PAN address (must be the same for all xbees)
-#define XBEE_PAN_ID 0x0B0B  // DO NOT CHANGE without changing for all xbees
-#endif
-#ifndef LINK_XBEE_ADDRESS   //  XBee address of Link (connection to ground station housed in Command)
-#define LINK_XBEE_ADDRESS 0x0002    // DO NOT CHANGE without confirming with ground system definitions
-#endif
-
-// APIDs
-#ifndef CMD_APID
-#define CMD_APID 100
-#endif
-#ifndef HK_STAT_APID
-#define HK_STAT_APID 110
-#endif
-#ifndef IMU_STAT_APID
-#define IMU_STAT_APID 120
-#endif
-#ifndef ENV_STAT_APID
-#define ENV_STAT_APID 130
-#endif
-#ifndef PWR_STAT_APID
-#define PWR_STAT_APID 140
-#endif
-
 //// Data Structures
 // imu data
-#ifndef BALLONDUINO_NO_BNO
+
 struct IMUData_s
 {
         uint8_t system_cal;
@@ -128,36 +98,26 @@ struct IMUData_s
         float mag_y;
         float mag_z;
 };
-#endif
 
 // environmental data
 struct ENVData_s
 {
-#ifndef BALLOONDUINO_NO_BME
         float bme_pres;
         float bme_temp;
         float bme_humid;
-#endif
-#ifndef BALLOONDUINO_NO_SSC
         float ssc_pres;
         float ssc_temp;
-#endif
-#ifndef BALLOONDUINO_NO_BNO
         float bno_temp;
-#endif
-#ifndef BALLOONDUINO_NO_MCP
         float mcp_temp;
-#endif
 };
 
 // power data
-#ifndef BALLONDUINO_NO_ADS
+
 struct PWRData_s
 {
         float batt_volt;
         float i_consump;
 };
-#endif
 
 struct IntCtr_s
 {
@@ -172,7 +132,14 @@ class Balloonduino
     public:
         Balloonduino();
 
-        void begin();
+        bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B,
+        bool use_xbee = true,
+        bool use_bno = true,
+        bool use_mcp = true,
+        bool use_rtc = true,
+        bool use_bme = true,
+        bool use_ads = true,
+        bool use_ssc = true);
 
         // sensor reading
         void read_imu();
@@ -203,33 +170,22 @@ class Balloonduino
         ENVData_s ENVData;
 
         //// Declare objects
-#ifndef BALLONDUINO_NO_BNO
+
         Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x29);
         IMUData_s IMUData;
-#endif
 
-#ifndef BALLONDUINO_NO_MCP
         Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
-#endif
 
-#ifndef BALLONDUINO_NO_RTC
         RTC_DS1307 rtc = RTC_DS1307();
         RTC_Millis softrtc;    // This is the millis()-based software RTC
         uint32_t start_millis = 0;
-#endif
 
-#ifndef BALLONDUINO_NO_BME
         Adafruit_BME280 bme = Adafruit_BME280();
-#endif
 
-#ifndef BALLONDUINO_NO_ADS
         Adafruit_ADS1015 ads = Adafruit_ADS1015(0x4A);
         PWRData_s PWRData;
-#endif
 
-#ifndef BALLONDUINO_NO_SSC
         SSC ssc = SSC(0x28, 255);
-#endif
 };
 
 #endif
