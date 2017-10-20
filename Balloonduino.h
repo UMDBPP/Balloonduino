@@ -6,13 +6,9 @@
 #ifndef Balloonduino_h
 #define Balloonduino_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
 #include <stdio.h>
+
+#include "Arduino.h"
 
 // Non optional
 #include <avr/wdt.h> // watchdog timer
@@ -24,29 +20,14 @@
 #include <ccsds_util.h>
 #include <SD.h>
 
-bool xbee_enable = true;
-bool bno_enable = true;
-bool mcp_enable = true;
-bool rtc_enable = true;
-bool bme_enable = true;
-bool ads_enable = true;
-bool ssc_enable = true;
-
 // Optional hardware
+#include "RTClib.h" // RTC and SoftRTC
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
-
 #include "Adafruit_MCP9808.h"
-
-#include "RTClib.h" // RTC and SoftRTC
-
 #include <Adafruit_BME280.h>
-
 #include <Adafruit_ADS1015.h>
-
 #include <SSC.h>
-
-#define CYCLE_DELAY 100 // time between execution cycles [ms]
 
 //// Enumerations
 /* Requests for HK packets to be sent to specified xbee addresses have the following format:
@@ -78,6 +59,19 @@ bool ssc_enable = true;
 // so that the user doesn't have to keep track of which is which
 #define debug_serial Serial
 #define xbee_serial Serial
+
+// files
+File IMULogFile;
+File PWRLogFile;
+File ENVLogFile;
+
+bool xbee_enable = true;
+bool rtc_enable = true;
+bool bno_enable = true;
+bool mcp_enable = true;
+bool bme_enable = true;
+bool ads_enable = true;
+bool ssc_enable = true;
 
 //// Data Structures
 // imu data
@@ -132,14 +126,15 @@ class Balloonduino
     public:
         Balloonduino();
 
-        bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B,
-        bool use_xbee = true,
-        bool use_bno = true,
-        bool use_mcp = true,
-        bool use_rtc = true,
-        bool use_bme = true,
-        bool use_ads = true,
-        bool use_ssc = true);
+        bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B, String imu_logfile = "IMU_LOG.txt", String pwr_logfile = "PWR_LOG.txt",
+                String env_logfile = "ENV_LOG.txt",
+                bool use_xbee = true,
+                bool use_rtc = true,
+                bool use_bno = true,
+                bool use_mcp = true,
+                bool use_bme = true,
+                bool use_ads = true,
+                bool use_ssc = true, int cmd_apid = 100, int hk_stat_apid = 110, int imu_stat_apid = 120, int env_stat_apid = 130, int pwr_stat_apid = 140);
 
         // sensor reading
         void read_imu();
@@ -147,9 +142,9 @@ class Balloonduino
         void read_pwr();
 
         // log data
-        void log_imu(File IMULogFile);
-        void log_env(File ENVLogFile);
-        void log_pwr(File PWRLogFile);
+        void log_imu();
+        void log_env();
+        void log_pwr();
 
         // pkt creation
         uint16_t create_HK_pkt();
@@ -170,15 +165,14 @@ class Balloonduino
         ENVData_s ENVData;
 
         //// Declare objects
+        RTC_DS1307 rtc = RTC_DS1307();
+        RTC_Millis softrtc;    // This is the millis()-based software RTC
+        uint32_t start_millis = 0;
 
         Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x29);
         IMUData_s IMUData;
 
         Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
-
-        RTC_DS1307 rtc = RTC_DS1307();
-        RTC_Millis softrtc;    // This is the millis()-based software RTC
-        uint32_t start_millis = 0;
 
         Adafruit_BME280 bme = Adafruit_BME280();
 

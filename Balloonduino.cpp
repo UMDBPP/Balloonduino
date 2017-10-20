@@ -11,15 +11,15 @@ Balloonduino::Balloonduino()
     // do nothing
 }
 
-bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B, int cmd_apid = 100, hk_stat_apid = 110, imu_stat_apid = 120, env_stat_apid =
-        130, pwr_stat_apid = 140,
-bool use_xbee = true,
-bool use_bno = true,
-bool use_mcp = true,
-bool use_rtc = true,
-bool use_bme = true,
-bool use_ads = true,
-bool use_ssc = true)
+bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B, String imu_logfile = "IMU_LOG.txt", String pwr_logfile = "PWR_LOG.txt",
+        String env_logfile = "ENV_LOG.txt",
+        bool use_xbee = true,
+        bool use_rtc = true,
+        bool use_bno = true,
+        bool use_mcp = true,
+        bool use_bme = true,
+        bool use_ads = true,
+        bool use_ssc = true, int cmd_apid = 100, int hk_stat_apid = 110, int imu_stat_apid = 120, int env_stat_apid = 130, int pwr_stat_apid = 140)
 {
     /*
      * Disables watchdog timer (in case its on)
@@ -79,36 +79,6 @@ bool use_ssc = true)
         }
     }
 
-    //// Init BNO IMU
-    if (bno_enable)
-    {
-        if (!bno.begin())
-        {
-            debug_serial.println("WARNING: BNO055 initialization failure.");
-            initialized = false;
-        }
-        else
-        {
-            debug_serial.println("BNO055 initialized.");
-        }
-        delay(1000);
-        bno.setExtCrystalUse(true);
-    }
-
-    //// Init MCP9808 temperature sensor
-    if (mcp_enable)
-    {
-        if (!tempsensor.begin(0x18))
-        {
-            debug_serial.println("WARNING: MCP9808 initialization failure.");
-            initialized = false;
-        }
-        else
-        {
-            debug_serial.println("MCP9808 initialized.");
-        }
-    }
-
     //// Init DS1308 RTC
     /* The RTC is used so that the log files contain timestamps. If the RTC
      *  is not running (because no battery is inserted) the RTC will be initalized
@@ -139,6 +109,36 @@ bool use_ssc = true)
         //// SoftRTC (for subsecond precision)
         SoftRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
         start_millis = millis();    // get the current millisecond count
+    }
+
+    //// Init BNO IMU
+    if (bno_enable)
+    {
+        if (!bno.begin())
+        {
+            debug_serial.println("WARNING: BNO055 initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("BNO055 initialized.");
+        }
+        delay(1000);
+        bno.setExtCrystalUse(true);
+    }
+
+    //// Init MCP9808 temperature sensor
+    if (mcp_enable)
+    {
+        if (!tempsensor.begin(0x18))
+        {
+            debug_serial.println("WARNING: MCP9808 initialization failure.");
+            initialized = false;
+        }
+        else
+        {
+            debug_serial.println("MCP9808 initialized.");
+        }
     }
 
     //// Init BME environmental sensor
@@ -196,15 +196,18 @@ bool use_ssc = true)
     // NOTE: Filenames must be shorter than 8 characters
     if (bno_enable)
     {
-        File IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
+        IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
     }
 
     if (use_ads)
     {
-        File PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
+        PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
     }
 
-    File ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
+    if (bme_enable || ssc_enable || bno_enable || mcp_enable)
+    {
+        ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
+    }
 
     return initialized;
 }
@@ -300,7 +303,7 @@ void Balloonduino::read_env()
     }
 }
 
-void Balloonduino::log_imu(File IMULogFile)
+void Balloonduino::log_imu()
 {
     if (bno_enable)
     {
@@ -339,7 +342,7 @@ void Balloonduino::log_imu(File IMULogFile)
     }
 }
 
-void Balloonduino::log_env(File ENVLogFile)
+void Balloonduino::log_env()
 {
     if (bme_enable || ssc_enable || bno_enable || mcp_enable)
     {
@@ -381,7 +384,7 @@ void Balloonduino::log_env(File ENVLogFile)
     }
 }
 
-void Balloonduino::log_pwr(File PWRLogFile)
+void Balloonduino::log_pwr()
 {
     if (ads_enable)
     {
