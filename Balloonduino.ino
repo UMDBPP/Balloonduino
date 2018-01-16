@@ -1,9 +1,10 @@
-#include <Balloonduino.h>
+#include "Balloonduino.h"
+
+Balloonduino balloonduino;
 
 void setup()
 {
-    Balloonduino balloonduino = Balloonduino();
-    balloonduino.begin(xbee_address = 0x0006);
+    balloonduino.begin(0x0006);
 }
 
 void loop()

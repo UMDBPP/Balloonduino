@@ -6,20 +6,19 @@
 #include "Balloonduino.h"
 
 // Base library type
-Balloonduino::Balloonduino()
+Balloonduino::Balloonduino(void)
 {
     // do nothing
 }
 
-bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B, String imu_logfile = "IMU_LOG.txt", String pwr_logfile = "PWR_LOG.txt",
-        String env_logfile = "ENV_LOG.txt",
-        bool use_xbee = true,
+bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B,
+        bool use_xbee = true, int cmd_apid = 100, int hk_stat_apid = 110, int imu_stat_apid = 120, int env_stat_apid = 130, int pwr_stat_apid = 140,
         bool use_rtc = true,
         bool use_bno = true,
         bool use_mcp = true,
         bool use_bme = true,
         bool use_ads = true,
-        bool use_ssc = true, int cmd_apid = 100, int hk_stat_apid = 110, int imu_stat_apid = 120, int env_stat_apid = 130, int pwr_stat_apid = 140)
+        bool use_ssc = true)
 {
     /*
      * Disables watchdog timer (in case its on)
@@ -44,6 +43,12 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
     bme_enable = use_bme;
     ads_enable = use_ads;
     ssc_enable = use_ssc;
+
+    CMD_APID = cmd_apid;
+    HK_STAT_APID = hk_stat_apid;
+    IMU_STAT_APID = imu_stat_apid;
+    ENV_STAT_APID = env_stat_apid;
+    PWR_STAT_APID = pwr_stat_apid;
 
     // disable the watchdog timer immediately in case it was on because of a
     // commanded reboot
@@ -107,7 +112,7 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
         }
 
         //// SoftRTC (for subsecond precision)
-        SoftRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
+        softRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
         start_millis = millis();    // get the current millisecond count
     }
 
@@ -416,11 +421,6 @@ uint16_t Balloonduino::create_HK_pkt()
     {
         now = rtc.now();
     }
-    else
-    {
-        uint32_t mils = millis();
-        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U)
-    }
 
 // initalize counter to record length of packet
     uint16_t payloadSize = 0;
@@ -470,11 +470,6 @@ uint16_t Balloonduino::create_ENV_pkt()
     if (rtc_enable)
     {
         now = rtc.now();
-    }
-    else
-    {
-        uint32_t mils = millis();
-        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
     }
 
     // initalize counter to record length of packet
@@ -528,11 +523,6 @@ uint16_t Balloonduino::create_PWR_pkt()
     {
         now = rtc.now();
     }
-    else
-    {
-        uint32_t mils = millis();
-        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
-    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
@@ -579,11 +569,6 @@ uint16_t Balloonduino::create_IMU_pkt()
     if (rtc_enable)
     {
         now = rtc.now();
-    }
-    else
-    {
-        uint32_t mils = millis();
-        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
     }
 
     // initalize counter to record length of packet
@@ -892,15 +877,9 @@ void Balloonduino::print_time(File file)
     {
         now = rtc.now();
     }
-    else
-    {
-        uint32_t mils = millis();
-        now = makeTime(numberOfSeconds(mils), numberOfMinutes(mils), numberOfHours(mils), elapsedDays(mils), 0U, 0U);
-    }
 
     // print a datestamp to the file
     char buf[50];
     sprintf(buf, "%02d/%02d/%02d %02d:%02d:%02d", now.day(), now.month(), now.year(), now.hour(), now.minute(), now.second());
     file.print(buf);
 }
-
