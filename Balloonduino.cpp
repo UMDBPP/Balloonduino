@@ -12,7 +12,10 @@ Balloonduino::Balloonduino(void)
 }
 
 bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address = 0x0002, uint8_t xbee_pan_id = 0x0B0B,
-        bool use_xbee = true, int cmd_apid = 100, int hk_stat_apid = 110, int imu_stat_apid = 120, int env_stat_apid = 130, int pwr_stat_apid = 140,
+        bool use_xbee = true, int cmd_apid = 100, int hk_stat_apid = 101,
+        int packet_counter_apid = 110, int payload_name_apid = 119,
+        int env_stat_apid = 120, int imu_stat_apid = 130, int pwr_stat_apid =
+                140,
         bool use_rtc = true,
         bool use_bno = true,
         bool use_mcp = true,
@@ -44,11 +47,13 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
     ads_enable = use_ads;
     ssc_enable = use_ssc;
 
-    CMD_APID = cmd_apid;
-    HK_STAT_APID = hk_stat_apid;
-    IMU_STAT_APID = imu_stat_apid;
-    ENV_STAT_APID = env_stat_apid;
-    PWR_STAT_APID = pwr_stat_apid;
+    COMMAND_APID = cmd_apid;
+    STATUS_APID = hk_stat_apid;
+    PACKET_COUNTER_APID = packet_counter_apid;
+    PAYLOAD_NAME_APID = payload_name_apid;
+    IMU_PACKET_APID = imu_stat_apid;
+    ENVIRONMENTAL_PACKET_APID = env_stat_apid;
+    POWER_PACKET_APID = pwr_stat_apid;
 
     // disable the watchdog timer immediately in case it was on because of a
     // commanded reboot
@@ -66,24 +71,6 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
 
     bool initialized = true;
 
-    //// Init XBee radio
-    if (xbee_enable)
-    {
-        debug_serial.println("Beginning xbee init");
-
-        int xbeeStatus = InitXBee(xbee_address, xbee_pan_id, xbee_serial, false);
-        if (!xbeeStatus)
-        {
-            debug_serial.println("XBee initialized.");
-        }
-        else
-        {
-            debug_serial.print("ERROR: XBee initialization error with code: ");
-            debug_serial.println(xbeeStatus);
-            initialized = false;
-        }
-    }
-
     //// Init DS1308 RTC
     /* The RTC is used so that the log files contain timestamps. If the RTC
      *  is not running (because no battery is inserted) the RTC will be initalized
@@ -91,35 +78,118 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
      */
     if (rtc_enable)
     {
-        if (!rtc.begin())
+        InitStat.rtc_start = rtc.begin();
+        if (!InitStat.rtc_start)
         {
-            debug_serial.println("WARNING: DS1308 RTC initialization failure.");
-            initialized = false;
+            Serial.println("RTC NOT detected.");
         }
         else
         {
-            debug_serial.println("DS1308 RTC initialized.");
+            Serial.println("RTC detected!");
+            InitStat.rtc_running = rtc.isrunning();
+            if (!InitStat.rtc_running)
+            {
+                debug_serial.println("RTC is NOT running!");
+                // following line sets the RTC to the date & time this sketch was compiled
+                rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+                // To set the RTC with an explicit date & time:
+                // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+            }
         }
+    }
 
-        if (!rtc.isrunning())
+    //// SoftRTC (for subsecond precision)
+    SoftRTC.begin(rtc.now());  // Initialize SoftRTC to the current time
+    start_millis = millis();  // get the current millisecond count
+
+    //// Init SD card
+    /* The SD card is used to store all of the log files.
+     */
+    SPI.begin();
+    pinMode(53, OUTPUT);
+    InitStat.SD_detected = SD.begin(53);
+    if (!InitStat.SD_detected)
+    {
+        debug_serial.println("SD Card NOT detected.");
+    }
+    else
+    {
+        debug_serial.println("SD Card detected!");
+    }
+
+    //// Open log files
+    /* Link will log to 3 files, one for I/O to the xbee, one for I/O to the radio,
+     *  and one for recording its initialization status each time it starts up.
+     *  NOTE: Filenames must be shorter than 8 characters
+     */
+
+    if (xbee_enable)
+    {
+        xbeeLogFile = SD.open("XBEE_LOG.txt", FILE_WRITE);
+        delay(10);
+    }
+
+    // for data files, write a header
+    initLogFile = SD.open("INIT_LOG.txt", FILE_WRITE);
+    initLogFile.println("DateTime,RTCStart,RTCRun,BNO,BME,MCP,SSC,Xbee");
+    initLogFile.flush();
+    delay(10);
+
+    if (bno_enable)
+    {
+        IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
+        IMULogFile.println(
+                "DateTime,SystemCal[0-3],AccelCal[0-3],GyroCal[0-3],MagCal[0-3],AccelX[m/s^2],AccelY[m/s^2],AccelZ[m/s^2],GyroX[rad/s],GyroY[rad/s],GyroZ[rad/s],MagX[uT],MagY[uT],MagZ[uT]");
+        IMULogFile.flush();
+        delay(10);
+    }
+
+    if (ads_enable)
+    {
+        PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
+        PWRLogFile.println("DateTime,BatteryVoltage[V],CurrentConsumption[A]");
+        PWRLogFile.flush();
+        delay(10);
+    }
+
+    if (bme_enable || ssc_enable || bno_enable || mcp_enable)
+    {
+        ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
+        ENVLogFile.println(
+                "DateTime,BMEPressure[hPa],BMETemp[degC],BMEHumidity[%],SSCPressure[PSI],SSCTemp[degC],BNOTemp[degC],MCPTemp[degC]");
+        ENVLogFile.flush();
+        delay(10);
+    }
+
+    //// Init XBee
+    /* InitXbee() will configure the attached xbee so that it can talk to
+     *   xbees which also use this library. It also handles the initalization
+     *   of the adafruit xbee library
+     */
+    if (xbee_enable)
+    {
+        InitStat.xbeeStatus = ccsds_xbee.init(XBEE_ADDR, XBEE_PAN_ID,
+        xbee_serial, debug_serial);
+        if (!InitStat.xbeeStatus)
         {
-            debug_serial.println("WARNING: RTC is NOT running!");
-            // following line sets the RTC to the date & time this sketch was compiled
-            rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-            // This line sets the RTC with an explicit date & time, for example to set
-            // January 21, 2014 at 3am you would call:
-            // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+            debug_serial.println(F("XBee Initialized!"));
+        }
+        else
+        {
+            debug_serial.print(
+                    F("XBee Failed to Initialize with Error Code: "));
+            debug_serial.println(InitStat.xbeeStatus);
         }
 
-        //// SoftRTC (for subsecond precision)
-        softRTC.begin(rtc.now());    // Initialize SoftRTC to the current time
-        start_millis = millis();    // get the current millisecond count
+        ccsds_xbee.add_rtc(rtc);
+        ccsds_xbee.start_logging(xbeeLogFile);
     }
 
     //// Init BNO IMU
     if (bno_enable)
     {
-        if (!bno.begin())
+        InitStat.BNO_init = bno.begin();
+        if (!InitStat.BNO_init)
         {
             debug_serial.println("WARNING: BNO055 initialization failure.");
             initialized = false;
@@ -135,7 +205,8 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
     //// Init MCP9808 temperature sensor
     if (mcp_enable)
     {
-        if (!tempsensor.begin(0x18))
+        InitStat.MCP_init = tempsensor.begin(0x18);
+        if (!InitStat.MCP_init)
         {
             debug_serial.println("WARNING: MCP9808 initialization failure.");
             initialized = false;
@@ -149,7 +220,8 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
     //// Init BME environmental sensor
     if (bme_enable)
     {
-        if (!bme.begin(0x76))
+        InitStat.BME_init = bme.begin(0x76);
+        if (!InitStat.BME_init)
         {
             debug_serial.println("WARNING: BME280 initialization failure.");
             initialized = false;
@@ -161,11 +233,12 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
     }
 
     //// Init ADS power monitor
-    if (use_ads)
+    // ADC, used for current consumption/battery voltage
+    if (ads_enable)
     {
         ads.begin();
         ads.setGain(GAIN_ONE);
-        debug_serial.println("ADS1015 initialized.");
+        debug_serial.println("Initialized ADS1015");
     }
 
     //// Init SSC pressure sensor
@@ -177,637 +250,538 @@ bool Balloonduino::begin(uint8_t xbee_address = 0x0006, uint8_t cmd_xbee_address
         ssc.setMaxRaw(16383);
         ssc.setMinPressure(0.0);
         ssc.setMaxPressure(30);
-
         //  start the sensor
-        debug_serial.print("SSC start: ");
-        debug_serial.println(ssc.start());
+        InitStat.SSC_init = ssc.start();
+        if (!InitStat.SSC_init)
+        {
+            debug_serial.println("SSC started ");
+        }
+        else
+        {
+            debug_serial.println("SSC failed!");
+        }
     }
 
-    //// Init MicroSD storage
-    SPI.begin();
-    pinMode(53, OUTPUT);
-    if (!SD.begin(53))
-    {
-        debug_serial.println("SD Card initialization failure.");
-        initialized = false;
-    }
-    else
-    {
-        debug_serial.println("SD Card initialized.");
-    }
+    //// set interface counters to zero
+    CmdExeCtr = 0;
+    CmdRejCtr = 0;
+    XbeeRcvdByteCtr = 0;
+    XbeeSentByteCtr = 0;
 
-    // MicroSD
-    // appends to current file
-    // NOTE: Filenames must be shorter than 8 characters
-    if (bno_enable)
-    {
-        IMULogFile = SD.open("IMU_LOG.txt", FILE_WRITE);
-    }
-
-    if (use_ads)
-    {
-        PWRLogFile = SD.open("PWR_LOG.txt", FILE_WRITE);
-    }
-
-    if (bme_enable || ssc_enable || bno_enable || mcp_enable)
-    {
-        ENVLogFile = SD.open("ENV_LOG.txt", FILE_WRITE);
-    }
+    // write entry in init log file
+    print_time(initLogFile);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.rtc_start);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.rtc_running);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.BNO_init);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.BME_init);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.MCP_init);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.SSC_init);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.xbeeStatus);
+    initLogFile.print(", ");
+    initLogFile.print(InitStat.SD_detected);
+    initLogFile.println();
+    initLogFile.close();
 
     return initialized;
 }
 
-// populates the IMUData struct with data from the BNO IMU
-void Balloonduino::read_imu()
+void Balloonduino::read_env(struct ENVData_s *ENVData)
 {
-    if (bno_enable)
-    {
-        uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
-        bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
+    /*  read_env()
+     *
+     *  Reads all of the environmental sensors and stores data in
+     *  a structure.
+     *
+     */
 
-        // get measurements
-        imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);    // (values in uT, micro Teslas)
-        imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);    // (values in rps, radians per second)
-        imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);    // (values in m/s^2)
-
-        // assign them into structure fields
-        IMUData.system_cal = system_cal;
-        IMUData.accel_cal = accel_cal;
-        IMUData.gyro_cal = gyro_cal;
-        IMUData.mag_cal = mag_cal;
-        IMUData.accel_x = accel.x();
-        IMUData.accel_y = accel.y();
-        IMUData.accel_z = accel.z();
-        IMUData.gyro_x = gyro.x();
-        IMUData.gyro_y = gyro.y();
-        IMUData.gyro_z = gyro.z();
-        IMUData.mag_x = mag.x();
-        IMUData.mag_y = mag.y();
-        IMUData.mag_z = mag.z();
-    }
-}
-
-// populates the PWRData struct with data from the ADS
-void Balloonduino::read_pwr()
-{
-    if (ads_enable)
-    {
-        PWRData.batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606;    // V
-        PWRData.i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5) * 10;
-    }
-}
-
-// populates the ENVData struct with data from the BME
-void Balloonduino::read_env()
-{
-    if (bme_enable)
-    {
-        //BME280
-        ENVData.bme_pres = bme.readPressure() / 100.0F;    // hPa
-        ENVData.bme_temp = bme.readTemperature();       // degC
-        ENVData.bme_humid = bme.readHumidity();         // %
-    }
-    else
-    {
-        ENVData.bme_pres = 0.0F;    // hPa
-        ENVData.bme_temp = 0.0F;    // degC
-        ENVData.bme_humid = 0.0F;    // %
-    }
-
-    //  SSC
-    if (ssc_enable)
-    {
-        ssc.update();
-        ENVData.ssc_pres = ssc.pressure();      // PSI
-        ENVData.ssc_temp = ssc.temperature();      // degC
-    }
-    else
-    {
-        ENVData.ssc_pres = 0.0F;    // PSI
-        ENVData.ssc_temp = 0.0F;    // degC
-    }
-
+    //BME280
+    ENVData->bme_pres = bme.readPressure() / 100.0F; // hPa
+    ENVData->bme_temp = bme.readTemperature(); // degC
+    ENVData->bme_humid = bme.readHumidity(); // %
+    /*
+     * This is causing LINK to not respond to commands... not sure why
+     //  SSC
+     ssc.update();
+     ENVData->ssc_pres = ssc.pressure(); // PSI
+     ENVData->ssc_temp = ssc.temperature(); // degC
+     */
     // BNO
-    if (bno_enable)
-    {
-        ENVData.bno_temp = bno.getTemp();
-    }
-    else
-    {
-        ENVData.bno_temp = 0.0F;    // degC
-    }
+    ENVData->bno_temp = bno.getTemp();
 
     //MCP9808
-    if (mcp_enable)
-    {
-        ENVData.mcp_temp = tempsensor.readTempC();    // degC
-    }
-    else
-    {
-        ENVData.mcp_temp = 0.0F;
-    }
+    ENVData->mcp_temp = tempsensor.readTempC(); // degC
 }
 
-void Balloonduino::log_imu()
+void Balloonduino::read_pwr(struct PWRData_s *PWRData)
 {
-    if (bno_enable)
-    {
-        // print the time to the file
-        print_time(IMULogFile);
-
-        // print the sensor values
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.system_cal);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.accel_cal);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.gyro_cal);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.mag_cal);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.accel_x);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.accel_y);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.accel_z);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.gyro_x);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.gyro_y);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.gyro_z);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.mag_x);
-        IMULogFile.print(", ");
-        IMULogFile.print(IMUData.mag_y);
-        IMULogFile.print(", ");
-        IMULogFile.println(IMUData.mag_z);
-
-        IMULogFile.flush();
-    }
+    /*  read_pwr()
+     *
+     *  Reads all of the power sensors and stores data in
+     *  a structure.
+     *
+     */
+    PWRData->batt_volt = ((float) ads.readADC_SingleEnded(2)) * 0.002 * 3.0606; // V
+    PWRData->i_consump = (((float) ads.readADC_SingleEnded(3)) * 0.002 - 2.5)
+            * 10;
 }
 
-void Balloonduino::log_env()
+void Balloonduino::read_imu(struct IMUData_s *IMUData)
 {
-    if (bme_enable || ssc_enable || bno_enable || mcp_enable)
-    {
-        // print the time to the file
-        print_time(ENVLogFile);
+    /*  read_imu()
+     *
+     *  Reads all of the IMU sensors and stores data in
+     *  a structure.
+     *
+     */
+    uint8_t system_cal, gyro_cal, accel_cal, mag_cal = 0;
+    bno.getCalibration(&system_cal, &gyro_cal, &accel_cal, &mag_cal);
 
-        // print the sensor values
-        if (bme_enable)
-        {
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.bme_pres);
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.bme_temp);
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.bme_humid);
-        }
+    // get measurements
+    imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER); // (values in uT, micro Teslas)
+    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE); // (values in rps, radians per second)
+    imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER); // (values in m/s^2)
 
-        if (ssc_enable)
-        {
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.ssc_pres);
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.ssc_temp);
-        }
+    // assign them into global variables
+    IMUData->system_cal = system_cal;
+    IMUData->accel_cal = accel_cal;
+    IMUData->gyro_cal = gyro_cal;
+    IMUData->mag_cal = mag_cal;
+    IMUData->accel_x = accel.x();
+    IMUData->accel_y = accel.y();
+    IMUData->accel_z = accel.z();
+    IMUData->gyro_x = gyro.x();
+    IMUData->gyro_y = gyro.y();
+    IMUData->gyro_z = gyro.z();
+    IMUData->mag_x = mag.x();
+    IMUData->mag_y = mag.y();
+    IMUData->mag_z = mag.z();
 
-        if (bno_enable)
-        {
-            ENVLogFile.print(", ");
-            ENVLogFile.print(ENVData.bno_temp);
-        }
-
-        if (mcp_enable)
-        {
-            ENVLogFile.print(", ");
-            ENVLogFile.println(ENVData.mcp_temp);
-        }
-
-        ENVLogFile.flush();
-    }
 }
 
-void Balloonduino::log_pwr()
+void Balloonduino::log_imu(struct IMUData_s IMUData, File IMULogFile)
 {
-    if (ads_enable)
-    {
-        // print the time to the file
-        print_time(PWRLogFile);
+    /*  log_imu()
+     *
+     *  Writes the IMU data to a log file with a timestamp.
+     *
+     */
 
-        // print the sensor values
-        PWRLogFile.print(", ");
-        PWRLogFile.print(PWRData.batt_volt);
-        PWRLogFile.print(", ");
-        PWRLogFile.println(PWRData.i_consump);
+    // print the time to the file
+    print_time(IMULogFile);
 
-        PWRLogFile.flush();
-    }
+    // print the sensor values
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.system_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_cal);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_y);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.accel_z);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_y);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.gyro_z);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_x);
+    IMULogFile.print(", ");
+    IMULogFile.print(IMUData.mag_y);
+    IMULogFile.print(", ");
+    IMULogFile.println(IMUData.mag_z);
+
+    IMULogFile.flush();
 }
 
-uint16_t Balloonduino::create_HK_pkt()
+void Balloonduino::log_env(struct ENVData_s ENVData, File ENVLogFile)
+{
+    /*  log_env()
+     *
+     *  Writes the ENV data to a log file with a timestamp.
+     *
+     */
+
+    // print the time to the file
+    print_time(ENVLogFile);
+
+    // print the sensor values
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_pres);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bme_humid);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.ssc_pres);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.ssc_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.print(ENVData.bno_temp);
+    ENVLogFile.print(", ");
+    ENVLogFile.println(ENVData.mcp_temp);
+
+    ENVLogFile.flush();
+}
+
+void Balloonduino::log_pwr(struct PWRData_s PWRData, File PWRLogFile)
+{
+    /*  log_pwr()
+     *
+     *  Writes the PWR data to a log file with a timestamp.
+     *
+     */
+
+    // print the time to the file
+    print_time(PWRLogFile);
+
+    // print the sensor values
+    PWRLogFile.print(", ");
+    PWRLogFile.print(PWRData.batt_volt, 4);
+    PWRLogFile.print(", ");
+    PWRLogFile.println(PWRData.i_consump, 4);
+
+    PWRLogFile.flush();
+}
+
+uint16_t Balloonduino::create_HK_payload(uint8_t Pkt_Buff[])
 {
     /*  create_HK_pkt()
      *
      *  Creates an HK packet containing the values of all the interface counters.
-     *  Packet data is filled into the memory passed in as the argument
+     *  Packet data is filled into the memory passed in as the argument. This function
+     *  assumes that the buffer is large enough to hold this packet.
      *
      */
-
-// get the current time from the RTC
-    DateTime now;
-    if (rtc_enable)
-    {
-        now = rtc.now();
-    }
-
-// initalize counter to record length of packet
-    uint16_t payloadSize = 0;
-
-// add length of primary header
-    payloadSize += sizeof(CCSDS_PriHdr_t);
-
-// Populate primary header fields:
-    setAPID(OutPktBuf, HK_STAT_APID);
-    setSecHdrFlg(OutPktBuf, 1);
-    setPacketType(OutPktBuf, 0);
-    setVer(OutPktBuf, 0);
-    setSeqCtr(OutPktBuf, 0);
-    setSeqFlg(OutPktBuf, 0);
-
-// add length of secondary header
-    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
-
-    // Populate the secondary header fields:
-    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
-    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
-
-    // Add counter values to the pkt
-    payloadSize = addIntToTlm(IntCtr.CmdExeCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.CmdRejCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.XbeeRcvdByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(IntCtr.XbeeSentByteCtr, OutPktBuf, payloadSize);    // Add counter of sent packets to message
-    payloadSize = addIntToTlm(millis() / 1000L, OutPktBuf, payloadSize);    // Timer
-
-    // fill the length field
-    setPacketLength(OutPktBuf, payloadSize);
-
-    return payloadSize;
-}
-
-uint16_t Balloonduino::create_ENV_pkt()
-{
-    /*  create_ENV_pkt()
-     *
-     *  Creates an HK packet containing the values of all the interface counters.
-     *  Packet data is filled into the memory passed in as the argument
-     *
-     */
-
-    // get the current time from the RTC
-    DateTime now;
-    if (rtc_enable)
-    {
-        now = rtc.now();
-    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
 
-    // add length of primary header
-    payloadSize += sizeof(CCSDS_PriHdr_t);
-
-    // Populate primary header fields:
-    setAPID(OutPktBuf, ENV_STAT_APID);
-    setSecHdrFlg(OutPktBuf, 1);
-    setPacketType(OutPktBuf, 0);
-    setVer(OutPktBuf, 0);
-    setSeqCtr(OutPktBuf, 0);
-    setSeqFlg(OutPktBuf, 0);
-
-    // add length of secondary header
-    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
-
-    // Populate the secondary header fields:
-    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
-    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
-
     // Add counter values to the pkt
-    payloadSize = addFloatToTlm(ENVData.bme_pres, OutPktBuf, payloadSize);    // Add bme pressure to message [Float]
-    payloadSize = addFloatToTlm(ENVData.bme_temp, OutPktBuf, payloadSize);    // Add bme temperature to message [Float]
-    payloadSize = addFloatToTlm(ENVData.bme_humid, OutPktBuf, payloadSize);    // Add bme humidity to message [Float]
-    payloadSize = addFloatToTlm(ENVData.ssc_pres, OutPktBuf, payloadSize);    // Add ssc pressure to message [Float]
-    payloadSize = addFloatToTlm(ENVData.ssc_temp, OutPktBuf, payloadSize);    // Add ssc temperature to messsage [Float]
-    payloadSize = addFloatToTlm(ENVData.bno_temp, OutPktBuf, payloadSize);    // Add bno temperature to message [Float]
-    payloadSize = addFloatToTlm(ENVData.mcp_temp, OutPktBuf, payloadSize);    // Add mcp temperature to message [Float]
-
-    // fill the length field
-    setPacketLength(OutPktBuf, payloadSize);
+    payloadSize = addIntToTlm(CmdExeCtr, Pkt_Buff, payloadSize); // Add counter of sent packets to message
+    payloadSize = addIntToTlm(CmdRejCtr, Pkt_Buff, payloadSize); // Add counter of sent packets to message
+    payloadSize = addIntToTlm(ccsds_xbee.getRcvdByteCtr(), Pkt_Buff,
+            payloadSize); // Add counter of sent packets to message
+    payloadSize = addIntToTlm(ccsds_xbee.getSentByteCtr(), Pkt_Buff,
+            payloadSize); // Add counter of sent packets to message
+    payloadSize = addIntToTlm(millis() / 1000L, Pkt_Buff, payloadSize); // Timer
 
     return payloadSize;
 }
 
-uint16_t Balloonduino::create_PWR_pkt()
+uint16_t Balloonduino::create_ENV_payload(uint8_t payload[],
+        struct ENVData_s ENVData)
 {
     /*  create_ENV_pkt()
      *
-     *  Creates an HK packet containing the values of all the interface counters.
-     *  Packet data is filled into the memory passed in as the argument
+     *  Creates an ENV packet containing the values of all environmental sensors.
+     *  Packet data is filled into the memory passed in as the argument. This function
+     *  assumes that the buffer is large enough to hold this packet.
      *
      */
 
-    // get the current time from the RTC
-    DateTime now;
-    if (rtc_enable)
-    {
-        now = rtc.now();
-    }
+    uint16_t payloadSize = 0;
+    // Add counter values to the pkt
+    payloadSize = addFloatToTlm(ENVData.bme_pres, payload, payloadSize); // Add bme pressure to message [Float]
+    payloadSize = addFloatToTlm(ENVData.bme_temp, payload, payloadSize); // Add bme temperature to message [Float]
+    payloadSize = addFloatToTlm(ENVData.bme_humid, payload, payloadSize); // Add bme humidity to message [Float]
+    payloadSize = addFloatToTlm(ENVData.ssc_pres, payload, payloadSize); // Add ssc pressure to message [Float]
+    payloadSize = addFloatToTlm(ENVData.ssc_temp, payload, payloadSize); // Add ssc temperature to messsage [Float]
+    payloadSize = addFloatToTlm(ENVData.bno_temp, payload, payloadSize); // Add bno temperature to message [Float]
+    payloadSize = addFloatToTlm(ENVData.mcp_temp, payload, payloadSize); // Add mcp temperature to message [Float]
+
+    return payloadSize;
+
+}
+
+uint16_t Balloonduino::create_PWR_payload(uint8_t Pkt_Buff[],
+        struct PWRData_s PWRData)
+{
+    /*  create_PWR_pkt()
+     *
+     *  Creates an PWR packet containing the values of all the power/battery sensors.
+     *  Packet data is filled into the memory passed in as the argument. This function
+     *  assumes that the buffer is large enough to hold this packet.
+     *
+     */
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
 
-    // add length of primary header
-    payloadSize += sizeof(CCSDS_PriHdr_t);
-
-    // Populate primary header fields:
-    setAPID(OutPktBuf, PWR_STAT_APID);
-    setSecHdrFlg(OutPktBuf, 1);
-    setPacketType(OutPktBuf, 0);
-    setVer(OutPktBuf, 0);
-    setSeqCtr(OutPktBuf, 0);
-    setSeqFlg(OutPktBuf, 0);
-
-    // add length of secondary header
-    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
-
-    // Populate the secondary header fields:
-    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
-    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
-
     // Add counter values to the pkt
-    payloadSize = addFloatToTlm(PWRData.batt_volt, OutPktBuf, payloadSize);    // Add battery voltage to message [Float]
-    payloadSize = addFloatToTlm(PWRData.i_consump, OutPktBuf, payloadSize);    // Add current consumption to message [Float]
-
-    // fill the length field
-    setPacketLength(OutPktBuf, payloadSize);
+    payloadSize = addFloatToTlm(PWRData.batt_volt, Pkt_Buff, payloadSize); // Add battery voltage to message [Float]
+    payloadSize = addFloatToTlm(PWRData.i_consump, Pkt_Buff, payloadSize); // Add current consumption to message [Float]
 
     return payloadSize;
+
 }
 
-uint16_t Balloonduino::create_IMU_pkt()
+uint16_t Balloonduino::create_IMU_payload(uint8_t Pkt_Buff[],
+        struct IMUData_s IMUData)
 {
     /*  create_IMU_pkt()
      *
-     *  Creates an HK packet containing the values of all the interface counters.
-     *  Packet data is filled into the memory passed in as the argument
+     *  Creates an IMU packet containing the values of all the IMU sensors.
+     *  Packet data is filled into the memory passed in as the argument. This function
+     *  assumes that the buffer is large enough to hold this packet.
      *
      */
-
-    // get the current time from the RTC
-    DateTime now;
-    if (rtc_enable)
-    {
-        now = rtc.now();
-    }
 
     // initalize counter to record length of packet
     uint16_t payloadSize = 0;
 
-    // add length of primary header
-    payloadSize += sizeof(CCSDS_PriHdr_t);
-
-    // Populate primary header fields:
-    setAPID(OutPktBuf, IMU_STAT_APID);
-    setSecHdrFlg(OutPktBuf, 1);
-    setPacketType(OutPktBuf, 0);
-    setVer(OutPktBuf, 0);
-    setSeqCtr(OutPktBuf, 0);
-    setSeqFlg(OutPktBuf, 0);
-
-    // add length of secondary header
-    payloadSize += sizeof(CCSDS_TlmSecHdr_t);
-
-    // Populate the secondary header fields:
-    setTlmTimeSec(OutPktBuf, now.unixtime() / 1000L);
-    setTlmTimeSubSec(OutPktBuf, now.unixtime() % 1000L);
-
     // Add counter values to the pkt
-    payloadSize = addIntToTlm(IMUData.system_cal, OutPktBuf, payloadSize);    // Add system cal status to message [uint8_t]
-    payloadSize = addIntToTlm(IMUData.accel_cal, OutPktBuf, payloadSize);    // Add accelerometer cal status to message [uint8_t]
-    payloadSize = addIntToTlm(IMUData.gyro_cal, OutPktBuf, payloadSize);    // Add gyro cal status to message [uint8_t]
-    payloadSize = addIntToTlm(IMUData.mag_cal, OutPktBuf, payloadSize);    // Add mnagnetomter cal status to message [uint8_t]
-    payloadSize = addFloatToTlm(IMUData.accel_x, OutPktBuf, payloadSize);    // Add battery accelerometer x to message [Float]
-    payloadSize = addFloatToTlm(IMUData.accel_y, OutPktBuf, payloadSize);    // Add battery accelerometer y to message [Float]
-    payloadSize = addFloatToTlm(IMUData.accel_z, OutPktBuf, payloadSize);    // Add battery accelerometer z to message [Float]
-    payloadSize = addFloatToTlm(IMUData.gyro_x, OutPktBuf, payloadSize);    // Add battery accelerometer x to message [Float]
-    payloadSize = addFloatToTlm(IMUData.gyro_y, OutPktBuf, payloadSize);    // Add battery accelerometer y to message [Float]
-    payloadSize = addFloatToTlm(IMUData.gyro_z, OutPktBuf, payloadSize);    // Add battery accelerometer z to message [Float]
-    payloadSize = addFloatToTlm(IMUData.mag_x, OutPktBuf, payloadSize);    // Add battery accelerometer x to message [Float]
-    payloadSize = addFloatToTlm(IMUData.mag_y, OutPktBuf, payloadSize);    // Add battery accelerometer y to message [Float]
-    payloadSize = addFloatToTlm(IMUData.mag_z, OutPktBuf, payloadSize);    // Add battery accelerometer z to message [Float]
-
-    // fill the length field
-    setPacketLength(OutPktBuf, payloadSize);
+    payloadSize = addIntToTlm(IMUData.system_cal, Pkt_Buff, payloadSize); // Add system cal status to message [uint8_t]
+    payloadSize = addIntToTlm(IMUData.accel_cal, Pkt_Buff, payloadSize); // Add accelerometer cal status to message [uint8_t]
+    payloadSize = addIntToTlm(IMUData.gyro_cal, Pkt_Buff, payloadSize); // Add gyro cal status to message [uint8_t]
+    payloadSize = addIntToTlm(IMUData.mag_cal, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+    payloadSize = addFloatToTlm(IMUData.accel_x, Pkt_Buff, payloadSize); // Add battery accelerometer x to message [Float]
+    payloadSize = addFloatToTlm(IMUData.accel_y, Pkt_Buff, payloadSize); // Add battery accelerometer y to message [Float]
+    payloadSize = addFloatToTlm(IMUData.accel_z, Pkt_Buff, payloadSize); // Add battery accelerometer z to message [Float]
+    payloadSize = addFloatToTlm(IMUData.gyro_x, Pkt_Buff, payloadSize); // Add battery accelerometer x to message [Float]
+    payloadSize = addFloatToTlm(IMUData.gyro_y, Pkt_Buff, payloadSize); // Add battery accelerometer y to message [Float]
+    payloadSize = addFloatToTlm(IMUData.gyro_z, Pkt_Buff, payloadSize); // Add battery accelerometer z to message [Float]
+    payloadSize = addFloatToTlm(IMUData.mag_x, Pkt_Buff, payloadSize); // Add battery accelerometer x to message [Float]
+    payloadSize = addFloatToTlm(IMUData.mag_y, Pkt_Buff, payloadSize); // Add battery accelerometer y to message [Float]
+    payloadSize = addFloatToTlm(IMUData.mag_z, Pkt_Buff, payloadSize); // Add battery accelerometer z to message [Float]
 
     return payloadSize;
+
+}
+
+uint16_t Balloonduino::create_INIT_payload(uint8_t Pkt_Buff[],
+        struct InitStat_s InitStat)
+{
+    /*  create_IMU_pkt()
+     *
+     *  Creates an IMU packet containing the values of all the IMU sensors.
+     *  Packet data is filled into the memory passed in as the argument. This function
+     *  assumes that the buffer is large enough to hold this packet.
+     *
+     */
+
+    // initalize counter to record length of packet
+    uint16_t payloadSize = 0;
+
+    // Add counter values to the pkt
+    payloadSize = addIntToTlm(InitStat.xbeeStatus, Pkt_Buff, payloadSize); // Add system cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.rtc_running, Pkt_Buff, payloadSize); // Add accelerometer cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.rtc_start, Pkt_Buff, payloadSize); // Add gyro cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.BNO_init, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.MCP_init, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.BME_init, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.SSC_init, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+    payloadSize = addIntToTlm(InitStat.SD_detected, Pkt_Buff, payloadSize); // Add mnagnetomter cal status to message [uint8_t]
+
+    return payloadSize;
+
 }
 
 void Balloonduino::command_response(uint8_t data[], uint8_t data_len, File file)
 {
     /*  command_response()
      *
-     *  given an array of data (presumably containing a CCSDS packet), check if the
-     *  packet is a command packet, and if so, process it
+     *  given an array of data (presumably containing a CCSDS packet), check if:
+     *    the packet is a command packet
+     *    the APID is the LINK command packet APID
+     *    the checksum in the header is correct
+     *  if so, process it
+     *  otherwise, reject it
      */
-
-    debug_serial.print("Rcvd: ");
-    for (int i = 0; i < 8; i++)
-    {
-        debug_serial.print(data[i], HEX);
-        debug_serial.print(", ");
-    }
-    debug_serial.println();
 
     // get the APID (the field which identifies the type of packet)
     uint16_t _APID = getAPID(data);
 
-    // check if the data is a command packet with the Camera command APID
-    if (getPacketType(data) && _APID == CMD_APID)
+    if (_APID != COMMAND_APID)
     {
-        uint8_t FcnCode = getCmdFunctionCode(data);
-        uint16_t pktLength = 0;
-        uint8_t Pkt_Buff[100];
-        uint8_t destAddr = 0;
-
-        // respond to the command depending on what type of command it is
-        switch (FcnCode)
-        {
-            // NoOp Cmd
-            case COMMAND_NOOP:
-                // No action other than to increment the interface counters
-
-                debug_serial.println("Received NoOp Cmd");
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // HK_Req
-            case REQUEST_PACKET_COUNTERS:
-                // Requests that an HK packet be sent to the specified xbee address
-                /*  Command format:
-                 *   CCSDS Command Header (8 bytes)
-                 *   Xbee address (1 byte)
-                 */
-
-                debug_serial.println("Received HK_Req Cmd");
-
-                // extract the desintation address from the command
-                extractFromTlm(destAddr, data, 8);
-
-                // create a HK pkt
-                pktLength = this->create_HK_pkt();
-
-                // send the HK packet via xbee and log it
-                xbee_send_and_log(destAddr, Pkt_Buff, pktLength, file);
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // ResetCtr
-            case COMMAND_CLEAR_PACKET_COUNTERS:
-                // Requests that an HK packet be sent to the specified xbee address
-                /*  Command format:
-                 *   CCSDS Command Header (8 bytes)
-                 *   Xbee address (1 byte)
-                 */
-
-                debug_serial.println("Received ResetCtr Cmd");
-
-                IntCtr.CmdExeCtr = 0;
-                IntCtr.CmdRejCtr = 0;
-                IntCtr.XbeeRcvdByteCtr = 0;
-                IntCtr.XbeeSentByteCtr = 0;
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // ENV_Req
-            case REQUEST_ENVIRONMENTAL_DATA:
-                // Requests that an HK packet be sent to the specified xbee address
-                /*  Command format:
-                 *   CCSDS Command Header (8 bytes)
-                 *   Xbee address (1 byte)
-                 */
-
-                debug_serial.println("Received ENV_Req Cmd");
-
-                // extract the desintation address from the command
-                extractFromTlm(destAddr, data, 8);
-
-                // create a HK pkt
-                pktLength = this->create_ENV_pkt();
-
-                // send the HK packet via xbee and log it
-                xbee_send_and_log(destAddr, Pkt_Buff, pktLength, file);
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // PWR_Req
-            case REQUEST_POWER_DATA:
-                // Requests that an HK packet be sent to the specified xbee address
-                /*  Command format:
-                 *   CCSDS Command Header (8 bytes)
-                 *   Xbee address (1 byte)
-                 */
-
-                debug_serial.println("Received PWR_Req Cmd");
-
-                // extract the desintation address from the command
-                extractFromTlm(destAddr, data, 8);
-
-                // create a HK pkt
-                pktLength = this->create_PWR_pkt();
-
-                // send the HK packet via xbee and log it
-                xbee_send_and_log(destAddr, Pkt_Buff, pktLength, file);
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // IMU_Req
-            case REQUEST_IMU_DATA:
-                // Requests that an HK packet be sent to the specified xbee address
-                /*  Command format:
-                 *   CCSDS Command Header (8 bytes)
-                 *   Xbee address (1 byte)
-                 */
-
-                debug_serial.println("Received IMU_Req Cmd");
-
-                // extract the desintation address from the command
-                extractFromTlm(destAddr, data, 8);
-
-                // create a HK pkt
-                pktLength = this->create_IMU_pkt();
-
-                // send the HK packet via xbee and log it
-                xbee_send_and_log(destAddr, Pkt_Buff, pktLength, file);
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // Reboot
-            case COMMAND_REBOOT:
-                // Requests that Link reboot
-
-                debug_serial.println("Received Reboot Cmd");
-
-                // set the reboot timer
-                wdt_enable (WDTO_1S);
-
-                // increment the cmd executed counter
-                IntCtr.CmdExeCtr++;
-                break;
-
-                // unrecognized fcn code
-            default:
-                debug_serial.print("unrecognized fcn code ");
-                debug_serial.println(FcnCode, HEX);
-
-                // reject command
-                IntCtr.CmdRejCtr++;
-        }    // end switch(FcnCode)
-
-    }    // if(getPacketType(data) && _APID == CAM_CMD_APID)
-    else
-    {
-        debug_serial.print("Unrecognized ");
-        debug_serial.print(getPacketType(data));
-        debug_serial.print(" pkt apid 0x");
+        debug_serial.print("Unrecognized apid 0x");
         debug_serial.println(_APID, HEX);
+        return;
     }
-}
+    if (!getPacketType(data))
+    {
+        debug_serial.print("Not a command packet");
+        return;
+    }
+
+    // validate command checksum
+    /*if (!validateChecksum(data))
+    {
+     Serial.println("Command checksum doesn't validate");
+     CmdRejCtr++;
+     return;
+     }*/
+
+    uint8_t destAddr = 0;
+    uint16_t pktLength = 0;
+    uint8_t payloadLength = 0;
+    uint8_t Pkt_Buff[100];
+    uint8_t payload_buff[100];
+
+    // respond to the command depending on what type of command it is
+    switch (getCmdFunctionCode(data))
+    {
+
+        // NoOp Cmd
+        case COMMAND_NOOP:
+        {
+            // No action other than to increment the interface counters
+
+            debug_serial.println("Received NoOp Cmd");
+
+            // increment the cmd executed counter
+            CmdExeCtr++;
+            break;
+        }
+            // REQ_Name Cmd
+        case REQUEST_PAYLOAD_NAME:
+        {
+            /*
+             * This command requests that a packet containing the payload's
+             * name be sent to a specific xbee. The format of the command is:
+             *   CCSDS Command Header (8 bytes)
+             *   Xbee address (uint8_t)
+             * There is one parameter associated with this command, the address
+             * of the xbee to send the Name message to. The format of the Name message
+             * which is sent out is:
+             *   CCSDS Telemetry Header (12 bytes)
+             *   Payload Name (string, 8 bytes)
+             */
+            debug_serial.print("Received Name Cmd to addr ");
+
+            // define variables to process the command
+            uint8_t NamedestAddr = 0;
+            uint16_t pktLength = 0;
+            uint8_t payloadLength = 0;
+            int success_flg = 0;
+
+            // define buffer to create the response in
+            uint8_t Name_Payload_Buff[PKT_MAX_LEN];
+
+            // extract the desintation address from the command
+            extractFromTlm(NamedestAddr, data, 8);
+            debug_serial.println(NamedestAddr);
+
+            // Use sprintf to pad/trim the string if the payload name isn't
+            // exactly 8 characters
+            char payloadname[8];
+            sprintf(payloadname, "%8.8s", PAYLOAD_NAME);
+
+            // print the name to debug
+            debug_serial.println(payloadname);
+
+            // add the information to the buffer
+            payloadLength = addStrToTlm(payloadname, Name_Payload_Buff,
+                    payloadLength);
+
+            // send the telemetry message by adding the buffer to the header
+            success_flg = ccsds_xbee.sendTlmMsg(NamedestAddr, PAYLOAD_NAME_APID,
+                    Name_Payload_Buff, payloadLength);
+
+            if (success_flg > 0)
+            {
+                // increment the cmd executed counter
+                CmdExeCtr++;
+            }
+            else
+            {
+                CmdRejCtr++;
+            }
+            break;
+        }
+            // REQ_HK
+        case REQUEST_PACKET_COUNTERS:
+        {
+            // Requests that an HK packet be sent to the ground
+            debug_serial.print("Received HKReq Cmd to addr ");
+            /*  Command format:
+             *   CCSDS Command Header (8 bytes)
+             *   Xbee address (1 byte) (or 0 if Gnd)
+             */
+            uint8_t destAddr = 0;
+            uint16_t pktLength = 0;
+            uint8_t payloadLength = 0;
+
+            // extract the desintation address from the command
+            extractFromTlm(destAddr, data, 8);
+            debug_serial.println(destAddr);
+
+            // create a HK pkt
+            payloadLength = create_HK_payload(payload_buff);
+
+            pktLength = ccsds_xbee.createTlmMsg(Pkt_Buff, PACKET_COUNTER_APID,
+                    payload_buff, payloadLength);
+            if (pktLength > 0)
+            {
+
+                // send the data
+                send_and_log(destAddr, Pkt_Buff, pktLength);
+            }
+
+            // increment the cmd executed counter
+            CmdExeCtr++;
+            break;
+        }
+        case COMMAND_CLEAR_PACKET_COUNTERS:
+        {
+            // Requests that an HK packet be sent to the specified xbee address
+            /*  Command format:
+             *   CCSDS Command Header (8 bytes)
+             *   Xbee address (1 byte)
+             */
+
+            debug_serial.println("Received ResetCtr Cmd");
+
+            break;
+        }
+        case COMMAND_REBOOT:
+        {
+            // Requests reboot
+            debug_serial.println("Received Reboot Cmd");
+
+            // set the reboot timer
+            wdt_enable (WDTO_1S);
+
+            break;
+        }
+            // unrecognized fcn code
+        default:
+        {
+            debug_serial.print("unrecognized fcn code ");
+            debug_serial.println(getCmdFunctionCode(data), HEX);
+
+            // reject command
+            CmdRejCtr++;
+        }
+    } // end switch(FcnCode)
+
+} // end command_response()
 
 void Balloonduino::xbee_send_and_log(uint8_t dest_addr, uint8_t data[], uint8_t data_len, File file)
 {
     /*  xbee_send_and_log()
      *
      *  Sends the given data out over the xbee and adds an entry to the xbee log file.
-     *  Also updates the radio sent counter.
      */
 
-    // send the data via xbee
-    _sendData(dest_addr, data, data_len);
+    // send the HK packet via xbee and log it
+    ccsds_xbee.sendRawData(dest_addr, data, data_len);
 
-    debug_serial.print("Forwarding: ");
+    debug_serial.print('Sent packet to ');
+    debug_serial.println(dest_addr);
     for (int i = 0; i <= data_len; i++)
     {
         debug_serial.print(data[i], HEX);
@@ -876,6 +850,10 @@ void Balloonduino::print_time(File file)
     if (rtc_enable)
     {
         now = rtc.now();
+    }
+    else
+    {
+        now = SoftRTC.now();
     }
 
     // print a datestamp to the file
